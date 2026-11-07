@@ -1,0 +1,24 @@
+{
+  "name": "HIDDEN SIDE — Image Excavator",
+  "short_name": "HIDDEN SIDE",
+  "description": "An image excavator. WebGL materials, latent structures, and temporal residues.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#10100f",
+  "theme_color": "#10100f",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

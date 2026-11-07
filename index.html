@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#101010">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HIDDEN SIDE">
+  <meta name="description" content="Images beneath images.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="stylesheet" href="./style.css?v=037">
+  <title>HIDDEN SIDE — image excavator</title>
+</head>
+<body>
+  <main id="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / 0.3.7</small></div></div>
+      <div class="top-meta"><span id="sourceTag">NO SIGNAL</span><span id="dimensionsTag">—</span></div>
+    </header>
+
+    <section id="stage" aria-label="Processed image preview">
+      <div id="canvas-host"></div>
+      <div class="stage-crosshair stage-crosshair-tl" aria-hidden="true"></div>
+      <div class="stage-crosshair stage-crosshair-br" aria-hidden="true"></div>
+      <div class="stage-topline"><span id="modeIndex">01 / 05</span><span id="recState"></span></div>
+      <div id="emptyState" class="empty-state">
+        <div class="empty-symbol" aria-hidden="true"><div></div><div></div><div></div></div>
+        <div class="empty-title">BENEATH THE IMAGE</div>
+        <button id="emptyImport" class="outline-action" type="button">IMPORT <span>+</span></button>
+      </div>
+      <div class="stage-bottomline"><span id="assetName">NO SOURCE LOADED</span><span id="timecode">00:00</span></div>
+    </section>
+
+    <section class="control-area" aria-label="Processing controls">
+      <div class="section-heading"><span>MODES <span class="muted">/ 05</span></span><button id="reroll" class="plain-button" type="button" aria-label="Reseed image transformations">RESEED</button></div>
+      <div class="mode-strip" id="modes" role="group" aria-label="Processing modes">
+        <button type="button" class="mode-button active" data-mode="0"><span class="mode-num">01</span><span class="mode-name">UNDER</span></button>
+        <button type="button" class="mode-button" data-mode="1"><span class="mode-num">02</span><span class="mode-name">NEGATIVE</span></button>
+        <button type="button" class="mode-button" data-mode="2"><span class="mode-num">03</span><span class="mode-name">RELIEF</span></button>
+        <button type="button" class="mode-button" data-mode="3"><span class="mode-num">04</span><span class="mode-name">SEEP</span></button>
+        <button type="button" class="mode-button" data-mode="4"><span class="mode-num">05</span><span class="mode-name">GHOST</span></button>
+      </div>
+      <div class="variant-row" id="variantRow">
+        <div class="variant-strip" id="variantStrip" role="group" aria-label="Variant profile">
+          <button type="button" class="variant-button active" data-variant="0" aria-pressed="true">QUIET</button>
+          <button type="button" class="variant-button" data-variant="1" aria-pressed="false">WILD</button>
+        </div>
+        <label class="trail-control" id="trailControl" hidden>
+          <span class="trail-heading"><span>TRAIL</span><output id="trailValue">55</output></span>
+          <input id="trail" type="range" min="0" max="100" value="55" aria-label="Ghost trail length">
+        </label>
+      </div>
+      <div class="sliders">
+        <label class="parameter"><div class="parameter-info"><span>DEPTH</span><output id="depthValue">50</output></div><input id="depth" type="range" min="0" max="100" value="50"></label>
+        <label class="parameter"><div class="parameter-info"><span>EROSION</span><output id="erosionValue">36</output></div><input id="erosion" type="range" min="0" max="100" value="36"></label>
+        <label class="parameter"><div class="parameter-info"><span>DRIFT</span><output id="driftValue">22</output></div><input id="drift" type="range" min="0" max="100" value="22"></label>
+      </div>
+      <div class="render-config">
+        <label for="renderQuality">QUALITY</label>
+        <select id="renderQuality" aria-label="Preview quality">
+          <option value="eco">ECO / 520</option>
+          <option value="balanced" selected>BALANCED / 720</option>
+          <option value="fine">FINE / 960</option>
+        </select>
+      </div>
+    </section>
+
+    <footer class="actionbar">
+      <button type="button" id="importButton" class="action"><span class="action-icon">+</span><span>IMPORT</span></button>
+      <button type="button" id="playButton" class="action" disabled><span class="action-icon" id="playIcon">▶</span><span id="playLabel">PLAY</span></button>
+      <button type="button" id="saveButton" class="action action-primary" disabled><span class="action-icon">↓</span><span>SAVE IMAGE</span></button>
+      <button type="button" id="recordButton" class="action action-record" disabled><span class="record-dot"></span><span id="recordLabel">RECORD</span></button>
+    </footer>
+    <div class="bottom-note" id="status" role="status" aria-live="polite">LOCAL / GPU</div>
+  </main>
+
+  <input id="fileInput" type="file" accept="image/*,video/*,.mov,.mp4,.m4v,.webm" hidden>
+  <div id="exportPanel" class="export-overlay" hidden role="dialog" aria-label="Video export">
+    <div class="export-sheet">
+      <div class="sheet-heading"><span>VIDEO READY</span><button type="button" id="closeExport" aria-label="Close">×</button></div>
+      <p id="exportDetails">The processed video is ready.</p>
+      <div class="export-actions"><button type="button" id="shareVideo" class="outline-action">SHARE VIDEO</button><button type="button" id="downloadVideo" class="outline-action primary">SAVE FILE ↓</button></div>
+      <small>Use SHARE VIDEO or SAVE FILE. Export format depends on the browser.</small>
+    </div>
+  </div>
+  <video id="sourceVideo" muted playsinline webkit-playsinline preload="auto" style="display:none"></video>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
+  <script src="./app.js?v=037"></script>
+</body>
+</html>
