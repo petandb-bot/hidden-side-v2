@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.3.9 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.0 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -244,7 +244,7 @@ const FRAGMENT_SHADER = `
     float baseDisp = 0.0012 + e*0.0082 + variant*0.0015;
     vec2 displaced = uv + flow*baseDisp*(0.22+u_drift*0.70);
     displaced += flow*gesture*(0.013 + kinetic*0.030 + variant*0.006);
-    displaced += vec2(flow.y, -flow.x)*structureField*(0.0038+e*0.0056);
+    displaced += vec2(flow.y, -flow.x)*structureField*(0.0022+e*0.0038);
     float incident = 0.0;
     if (u_accident.x>0.001) {
       vec2 incidentDelta = (uv-u_accident.zw)*aspect;
@@ -270,7 +270,7 @@ const FRAGMENT_SHADER = `
     float gy = lum(src(displaced+vec2(0.0,stepUV.y))) - lum(src(displaced-vec2(0.0,stepUV.y)));
     float edge = sat(length(vec2(gx,gy))*(2.6+3.8*d+0.4*variant));
     float outline = smoothstep(0.16,0.44,edge);
-    float organ = sat(n*0.74+medium*0.26 + structureField*0.08);
+    float organ = sat(n*0.74+medium*0.26 + structureField*0.05);
     vec3 color = c;
     vec2 ghostPastUv = uv;
 
@@ -310,56 +310,53 @@ const FRAGMENT_SHADER = `
         color = mix(color,remnant,(0.16+0.12*d+0.10*variant)*u_memory);
       }
     } else if (u_mode<1.5) {
-      vec3 neg = pow(sat3(1.0-c),vec3(0.92+0.10*d-0.08*variant));
-      color = mix(neg,vec3(0.90,0.92,0.95),0.06+e*0.08+0.08*variant);
-      float warmth = smoothstep(0.22,0.61,l)*(1.0-smoothstep(0.66,0.95,l));
-      color = mix(color,vec3(0.46,0.35,0.38),warmth*(0.08+0.16*d+0.08*variant));
-      float exposureLevel = 0.40 + 0.12*noise2(vec2(t*0.08+u_seed,3.7));
-      float latent = (1.0-smoothstep(0.055,0.16-0.03*variant,abs(l-exposureLevel)));
-      latent *= smoothstep(0.34,0.74,organ)*(0.12+0.20*e+0.18*variant);
-      latent = sat(latent + structureRidge*(0.09+0.18*e));
-      color = mix(color, mix(vec3(0.95,0.95,0.90), vec3(0.98,0.98,0.95), variant), latent);
-      vec2 fringe = vec2(gx,gy)*u_texel*(2.8+8.0*e+6.0*variant);
-      float cyanRim = outline*(0.16+0.20*e+0.14*variant);
-      color = mix(color,mix(vec3(0.32,0.66,0.80), vec3(0.38,0.74,0.88), variant),cyanRim);
-      color.r += (src(displaced+fringe).r-c.r)*(0.08+0.08*variant)*e;
-      color.b += (src(displaced-fringe).b-c.b)*(0.07+0.09*variant)*e;
-      color = mix(color,vec3(0.33,0.30,0.42),(micro-0.53)*e*(0.05+0.08*variant));
-      color = mix(color,c,0.16-0.08*variant);
-      color = mix(color,vec3(0.93,0.96,0.98),gesture*(0.10+0.08*d+0.08*variant));
+      vec3 neg = pow(sat3(1.0-c), vec3(0.97+0.06*d-0.05*variant));
+      color = mix(neg, vec3(0.92,0.94,0.96), 0.03+0.05*variant);
+      float silver = smoothstep(0.24,0.76,l)*(1.0-smoothstep(0.74,0.96,l));
+      color = mix(color, vec3(0.42,0.36,0.38), silver*(0.05+0.08*d));
+      float latentCenter = 0.43 + 0.08*noise2(vec2(t*0.06+u_seed,4.1)) + structureField*0.04;
+      float latent = exp(-pow((l-latentCenter)/(0.09+0.02*variant), 2.0));
+      latent *= (0.10+0.16*e+0.08*variant);
+      color = mix(color, mix(vec3(0.95,0.95,0.91), vec3(0.98,0.98,0.95), variant), latent);
+      float halation = smoothstep(0.18,0.62,outline) * smoothstep(0.46,0.92,l);
+      vec3 coolEdge = mix(vec3(0.26,0.60,0.78), vec3(0.42,0.76,0.94), variant);
+      color = mix(color, coolEdge, halation*(0.08+0.10*e+0.05*variant));
+      vec2 fringeDir = normalize(vec2(gx,gy)+vec2(0.0001));
+      vec2 fringe = fringeDir*u_texel*(1.6+4.0*e+2.0*variant);
+      color.r += (src(displaced+fringe).r-c.r)*(0.04+0.05*variant)*e;
+      color.b += (src(displaced-fringe).b-c.b)*(0.04+0.06*variant)*e;
+      color = mix(color, vec3(l)*0.84+vec3(0.11), 0.04);
+      color = mix(color, c, 0.18-0.08*variant);
+      color = mix(color, vec3(0.95,0.97,0.99), gesture*(0.07+0.06*d));
       if(variant>0.5) {
-        float solar = 1.0-smoothstep(0.07,0.25,abs(l-(0.47+structureField*0.13)));
-        float paper = 1.0-smoothstep(0.35,0.89,organ);
-        vec3 silver = mix(vec3(0.75,0.66,0.65),vec3(0.055,0.085,0.11),smoothstep(0.39,0.64,l));
-        color = mix(color,silver,solar*(0.22+0.36*e));
-        color = mix(color,vec3(0.96,0.95,0.87),paper*outline*(0.12+0.22*e));
-      } else {
-        color = mix(color,vec3(l)*0.86+vec3(0.12),0.045);
+        float bleach = smoothstep(0.60,0.96,l+outline*0.15);
+        float solar = smoothstep(0.36,0.56,l) * (1.0-smoothstep(0.56,0.74,l));
+        color = mix(color, vec3(0.985,0.985,0.97), bleach*(0.10+0.18*e));
+        color = mix(color, vec3(0.14,0.16,0.22), solar*(0.08+0.12*e));
       }
     } else if (u_mode<2.5) {
-      float angle = t*(0.15+0.04*variant)+u_seed*0.07;
-      vec3 lightDirection = normalize(vec3(-0.62*cos(angle)-0.18,
-                                            0.48*sin(angle*0.76+0.6)+0.20,0.76));
-      vec3 normal = normalize(vec3(-gx*(3.2+d*6.2+1.5*variant),-gy*(3.2+d*6.2+1.5*variant),0.52+0.16*(1.0-d)));
-      float light = sat(dot(normal,lightDirection)*0.55+0.36);
-      float elevation = l+(organ-0.5)*(0.09+0.08*variant)*e + gesture*(0.06+0.08*e) + structureField*0.10;
-      float bands = 8.0 + d*16.0 + variant*6.0;
-      float contour = 1.0-smoothstep(0.018,0.060,abs(fract(elevation*bands)-0.5));
-      vec3 chalk = mix(vec3(0.13,0.13,0.15),vec3(0.67,0.63,0.58),light);
-      vec3 halo = vec3(0.86,0.84,0.80);
-      chalk = mix(chalk,halo,smoothstep(0.50,0.86,elevation)*(0.42+0.20*variant));
-      color = mix(chalk,vec3(0.07,0.07,0.08),contour*(0.14+0.22*e));
-      color = mix(color,vec3(0.04,0.04,0.05),outline*(0.18+0.10*variant));
-      color += (micro-0.5)*e*(0.05+0.04*variant);
-      color += halo*outline*variant*0.08;
-      color = mix(color,halo,structureRidge*(0.08+0.12*e));
-      color = mix(color, c, 0.10-0.03*variant);
+      float angle = t*(0.13+0.04*variant)+u_seed*0.07;
+      vec3 lightDirection = normalize(vec3(-0.58*cos(angle)-0.20,
+                                            0.44*sin(angle*0.74+0.6)+0.22,0.80));
+      vec3 normal = normalize(vec3(-gx*(2.8+d*5.6+1.0*variant),-gy*(2.8+d*5.6+1.0*variant),0.62+0.12*(1.0-d)));
+      float light = sat(dot(normal,lightDirection)*0.56+0.38);
+      vec3 baseStone = mix(vec3(0.12,0.12,0.14), vec3(0.70,0.67,0.63), light);
+      float elevation = l + (organ-0.5)*(0.05+0.06*variant)*e + gesture*(0.04+0.05*e) + structureField*0.06;
+      vec3 warmLift = vec3(0.88,0.85,0.80) * smoothstep(0.52,0.88,elevation) * (0.22+0.12*variant);
+      float spec = pow(max(dot(reflect(-lightDirection, normal), vec3(0.0,0.0,1.0)), 0.0), 10.0+16.0*variant);
+      float rim = pow(1.0-sat(dot(normal, vec3(0.0,0.0,1.0))), 1.6);
+      color = baseStone + warmLift;
+      color = mix(color, vec3(0.05,0.05,0.06), outline*(0.08+0.05*variant));
+      color += vec3(0.20,0.20,0.24) * spec * (0.10+0.16*d);
+      color += vec3(0.12,0.14,0.20) * rim * (0.03+0.08*variant);
+      color += (micro-0.5)*e*(0.02+0.02*variant);
+      color = mix(color, vec3(0.84,0.84,0.90), structureRidge*(0.03+0.05*e));
       if(variant>0.5) {
-        float glint = smoothstep(0.16,0.49,edge)*(1.0-smoothstep(0.57,0.88,edge));
-        float lightBand = 0.55+0.45*sin(angle*0.67+uv.x*4.0+uv.y*3.0);
-        color += vec3(0.24,0.21,0.34)*glint*lightBand*(0.18+0.45*e);
-        color = mix(color,vec3(0.74,0.74,0.82),glint*lightBand*(0.04+0.23*d));
+        float prism = smoothstep(0.18,0.46,edge) * smoothstep(0.42,0.86,light);
+        color += vec3(0.14,0.10,0.20) * prism * (0.05+0.11*e);
+        color += vec3(0.06,0.11,0.16) * prism * (0.04+0.08*d);
       }
+      color = mix(color, c, 0.12-0.04*variant);
     } else if (u_mode<3.5) {
       float liquid = l + structureField*(0.14+0.11*e) + (organ-0.52)*(0.24*e+0.12*variant)-outline*(0.09-0.03*variant);
       liquid += (noise2(field*0.55 + vec2(t*0.05,-t*0.03))-0.5)*e*(0.11+0.12*variant);
@@ -401,11 +398,11 @@ const FRAGMENT_SHADER = `
       vec3 left = src(displaced-shift*(0.90+0.20*variant));
       vec3 ghost = vec3(right.r,c.g*(0.78-0.07*variant)+right.b*(0.10+0.05*variant)+left.g*0.12,left.b);
       float corridor = fbm(uv*vec2(13.0,5.2)+vec2(-t*(0.15+0.05*variant),u_seed));
-      float spreadMix = 0.22 + 0.12*e + 0.10*variant;
+      float spreadMix = 0.18 + 0.10*e + 0.08*variant;
       color = mix(c,ghost,spreadMix);
       color = mix(color,vec3(0.055,0.06,0.078),0.06+0.06*d+0.03*variant);
       color += vec3(0.10,0.04,0.16)*outline*(0.04+0.12*e+0.08*variant);
-      color += vec3(0.008,0.070,0.082)*(corridor-0.50)*e*(0.12+0.16*variant);
+      color += vec3(0.010,0.082,0.094)*(corridor-0.50)*e*(0.10+0.13*variant);
       color += (micro-0.5)*e*(0.018+0.024*variant);
       color += vec3(0.10,0.05,0.13)*gesture*(0.08+0.12*e+0.08*variant);
       color = mix(color, c, 0.22-0.06*variant);
@@ -417,15 +414,26 @@ const FRAGMENT_SHADER = `
         vec3 secondImage = src(displaced+denseOffset);
         vec3 doubleExposure = vec3(color.r*0.68+secondImage.b*0.32,
                                    color.g*0.56+secondImage.g*0.44,secondImage.r*0.78+color.b*0.22);
-        color = mix(color,doubleExposure,0.10+0.12*e);
+        color = mix(color,doubleExposure,0.07+0.09*e);
       }
       if(variant>0.5 && u_historyMix>0.5) {
         vec2 separation = vec2(0.005+0.010*e,0.001+0.004*e);
         separation *= 0.52+0.48*sin(t*0.21+u_seed);
         vec3 secondary = past(uv+separation+flow*0.006);
-        color = mix(color,vec3(secondary.b,color.g*0.52+secondary.g*0.48,secondary.r),0.05+0.10*e);
+        color = mix(color,vec3(secondary.b,color.g*0.52+secondary.g*0.48,secondary.r),0.04+0.08*e);
       }
     }
+
+
+    float opticWeight = (0.03 + 0.10*u_drift) * (0.55 + 0.45*variant);
+    float leakSweep = smoothstep(0.74, 0.98, 0.5 + 0.5*sin(uv.x*1.9 + uv.y*0.8 + t*0.10 + u_seed*0.13));
+    vec3 leakColor = mix(vec3(0.10,0.16,0.28), vec3(0.92,0.46,0.20), 0.5 + 0.5*sin(t*0.05 + u_seed*0.07));
+    color += leakColor * leakSweep * opticWeight * smoothstep(0.36,0.92,organ);
+    vec2 bleedStep = u_texel*(1.5 + 4.0*e);
+    vec3 bleed = vec3(src(clamp(displaced+vec2(bleedStep.x,0.0),vec2(0.001),vec2(0.999))).r,
+                      c.g,
+                      src(clamp(displaced-vec2(0.0,bleedStep.y),vec2(0.001),vec2(0.999))).b);
+    color = mix(color, bleed, opticWeight * 0.12 * smoothstep(0.40,0.88,l+outline*0.08));
 
     if(u_accident.x>0.001) {
       if(u_accident.y<0.5) {
@@ -1206,7 +1214,7 @@ function updateTrailUI() {
   $('trailValue').textContent = String(Math.round(state.trail * 100)).padStart(2, '0');
 }
 
-const STRUCTURE_NAMES = ['LAMINA', 'SHEAR', 'CURVE', 'FIELD'];
+const STRUCTURE_NAMES = ['LAMINA', 'SHEAR', 'CURVE', 'FIELD', 'LENS', 'DRIFT'];
 
 function scheduleAccident(now, first = false) {
   const a = state.accident;
@@ -1245,22 +1253,23 @@ function updateAccident(now) {
 function reseedStructure() {
   if (state.isRecording || state.recordStarting) return;
   const previousFamily = state.structure.family;
-  const nextFamily = (previousFamily + 1 + Math.floor(Math.random() * 3)) % 4;
+  const step = 1 + Math.floor(Math.random() * 5);
+  const nextFamily = (previousFamily + step) % 6;
   state.seed = 1 + Math.random() * 119;
   state.structure = {
     family: nextFamily,
     angle: (Math.random() * 2 - 1) * Math.PI,
-    scale: 0.82 + Math.random() * 0.78,
-    warp: 0.18 + Math.random() * 0.62,
-    offsetX: (Math.random() * 2 - 1) * 1.8,
-    offsetY: (Math.random() * 2 - 1) * 1.8,
-    bias: (Math.random() * 2 - 1) * 0.22,
-    amount: 0.30 + Math.random() * 0.24
+    scale: 0.84 + Math.random() * 0.94,
+    warp: 0.12 + Math.random() * 0.52,
+    offsetX: (Math.random() * 2 - 1) * 2.2,
+    offsetY: (Math.random() * 2 - 1) * 2.2,
+    bias: (Math.random() * 2 - 1) * 0.28,
+    amount: 0.22 + Math.random() * 0.34
   };
   resetFeedback();
   state.lastRenderTime = 0;
   scheduleAccident(performance.now(), true);
-  setStatus('FIELD / ' + STRUCTURE_NAMES[nextFamily]);
+  setStatus('RESEED / ' + STRUCTURE_NAMES[nextFamily]);
 }
 
 function bindEvents() {
