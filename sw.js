@@ -1,4 +1,4 @@
-const VERSION = 'hidden-side-v0.3.7';
+const VERSION = 'hidden-side-v0.3.8';
 const ASSETS = ['./', './index.html', './app.js?v=037', './style.css?v=037', './icon.svg', './icon-192.png', './icon-512.png', './manifest.webmanifest'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(VERSION).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));

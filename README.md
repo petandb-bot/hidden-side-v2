@@ -1,4 +1,4 @@
-# HIDDEN SIDE v0.3.7
+# HIDDEN SIDE v0.3.8
 
 GPU-based image excavator for photographs and video. WebGL1 and p5.js 1.11.13.
 
@@ -36,4 +36,4 @@ Deploy all files together to an HTTPS static host (for example, GitHub Pages). O
 
 **v0.3.6 — DISTINCT VARIANTS.** UNDER/WILD develops fractured strata; NEGATIVE/BLEACH adds local solarisation and silver/paper thresholds; RELIEF/HALO introduces luminous contours; SEEP/FILM responds with interference coloration; GHOST/DENSE adds a second chromatic apparition. Their alternate profiles retain the quieter original material.
 
-**v0.3.7 — RARE ACCIDENTS.** Four local events can occur without an explicit action: fracture, chemical reversal, displaced double exposure and pigment melt. Events are scheduled roughly 22–53 seconds after importing media and then 37–92 seconds after a completed event. They last around 1.15–2.75 seconds and decay automatically. DRIFT at zero suppresses visible accident intensity. No new UI or render buffers are used.
+**v0.3.8 — RARE ACCIDENTS.** Four local events can occur without an explicit action: fracture, chemical reversal, displaced double exposure and pigment melt. Events are scheduled roughly 22–53 seconds after importing media and then 37–92 seconds after a completed event. They last around 1.15–2.75 seconds and decay automatically. DRIFT at zero suppresses visible accident intensity. No new UI or render buffers are used.

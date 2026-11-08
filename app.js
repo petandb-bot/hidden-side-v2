@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.3.7 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.3.8 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -206,27 +206,30 @@ const FRAGMENT_SHADER = `
     float structureField = 0.0;
     float structureRidge = 0.0;
     if (u_structureA.w > 0.001) {
-    vec2 soil = axis*(2.4+u_structureA.z*1.8) + u_structureB.xy;
-    float foldNoise = noise2(soil*vec2(1.4,2.2)+vec2(u_seed*0.08,t*0.045));
+    vec2 soil = axis*(1.9+u_structureA.z*1.1) + u_structureB.xy;
+    float foldNoise = noise2(soil*vec2(1.05,1.65)+vec2(u_seed*0.06,t*0.032));
+    float softNoise = fbm(soil*0.82 + vec2(0.0, u_seed*0.04));
     if (u_structureA.x < 0.5) {
-      float bands = sin((soil.y+(foldNoise-0.5)*u_structureB.z)*13.0);
-      structureField = bands*0.53 + (foldNoise-0.5)*0.5;
-      structureRidge = pow(1.0-abs(bands),4.0);
+      float bands = sin((soil.y+(foldNoise-0.5)*u_structureB.z)*6.6);
+      structureField = bands*0.22 + (softNoise-0.5)*0.30;
+      structureRidge = smoothstep(0.84,0.98,0.5+0.5*cos((soil.y+(softNoise-0.5))*6.6));
     } else if (u_structureA.x < 1.5) {
-      float fault = soil.x+(foldNoise-0.5)*u_structureB.z*1.9;
-      structureField = 1.0-2.0*smoothstep(-0.10,0.10,fault);
-      structureRidge = 1.0-smoothstep(0.012,0.085,abs(fault));
+      float shear = soil.x*0.72 + (foldNoise-0.5)*u_structureB.z*0.95 + softNoise*0.55;
+      structureField = (softNoise-0.5)*0.52 + 0.22*tanh(shear*1.6);
+      structureRidge = exp(-abs(shear)*3.4) * (0.45+0.55*smoothstep(0.38,0.72,softNoise));
     } else if (u_structureA.x < 2.5) {
-      float ring = length(soil*vec2(1.0,1.3))+(foldNoise-0.5)*u_structureB.z;
-      structureField = sin(ring*12.0);
-      structureRidge = pow(1.0-abs(structureField),5.0);
+      float ring = length(soil*vec2(0.92,1.10))+(foldNoise-0.5)*u_structureB.z*0.55;
+      float curve = sin(ring*5.1 + softNoise*2.2);
+      structureField = curve*0.20 + (softNoise-0.5)*0.26;
+      structureRidge = smoothstep(0.80,0.97,0.5+0.5*cos(ring*5.1));
     } else {
-      vec2 cell = floor(soil*2.6);
-      structureField = (noise2(cell+u_seed*0.16)-0.5)*1.8;
-      structureRidge = 1.0-smoothstep(0.04,0.14,abs(fract(soil.x*2.6)-0.5));
+      vec2 cell = floor(soil*1.35);
+      float zone = noise2(cell+u_seed*0.12);
+      structureField = (zone-0.5)*0.48 + (softNoise-0.5)*0.22;
+      structureRidge = smoothstep(0.70,0.92,softNoise) * (0.45+0.55*zone);
     }
     structureField = clamp(structureField,-1.0,1.0)*u_structureA.w;
-    structureRidge *= u_structureA.w;
+    structureRidge *= 0.72*u_structureA.w;
     }
     vec2 field = uv*vec2(5.7,9.1) + vec2(u_seed,u_seed*0.31);
     float n = fbm(field + vec2(t*0.20,-t*0.14));
@@ -241,7 +244,7 @@ const FRAGMENT_SHADER = `
     float baseDisp = 0.0012 + e*0.0082 + variant*0.0015;
     vec2 displaced = uv + flow*baseDisp*(0.22+u_drift*0.70);
     displaced += flow*gesture*(0.013 + kinetic*0.030 + variant*0.006);
-    displaced += vec2(flow.y, -flow.x)*structureField*(0.009+e*0.011);
+    displaced += vec2(flow.y, -flow.x)*structureField*(0.0038+e*0.0056);
     float incident = 0.0;
     if (u_accident.x>0.001) {
       vec2 incidentDelta = (uv-u_accident.zw)*aspect;
@@ -267,7 +270,7 @@ const FRAGMENT_SHADER = `
     float gy = lum(src(displaced+vec2(0.0,stepUV.y))) - lum(src(displaced-vec2(0.0,stepUV.y)));
     float edge = sat(length(vec2(gx,gy))*(2.6+3.8*d+0.4*variant));
     float outline = smoothstep(0.16,0.44,edge);
-    float organ = sat(n*0.74+medium*0.26 + structureField*0.20);
+    float organ = sat(n*0.74+medium*0.26 + structureField*0.08);
     vec3 color = c;
     vec2 ghostPastUv = uv;
 
@@ -392,35 +395,35 @@ const FRAGMENT_SHADER = `
         color = mix(color,residue,pooling);
       }
     } else {
-      vec2 shift = vec2(0.0026+0.013*e+0.006*variant,0.0018+0.007*e+0.003*variant);
-      shift *= vec2(sin(t*(0.25+0.05*variant)+u_seed)*0.35+0.70,cos(t*(0.23+0.05*variant)+u_seed)*0.35+0.70);
-      vec3 right = src(displaced+shift+flow*(0.007+0.010*variant));
-      vec3 left = src(displaced-shift*(1.08+0.35*variant));
-      vec3 ghost = vec3(right.r,c.g*(0.72-0.10*variant)+right.b*(0.14+0.08*variant)+left.g*0.14,left.b);
-      float corridor = fbm(uv*vec2(16.0,6.5)+vec2(-t*(0.20+0.08*variant),u_seed));
-      float spreadMix = 0.34 + 0.18*e + 0.14*variant;
+      vec2 shift = vec2(0.0018+0.0080*e+0.0030*variant,0.0012+0.0046*e+0.0018*variant);
+      shift *= vec2(sin(t*(0.22+0.04*variant)+u_seed)*0.26+0.74,cos(t*(0.20+0.04*variant)+u_seed)*0.26+0.74);
+      vec3 right = src(displaced+shift+flow*(0.0030+0.0045*variant));
+      vec3 left = src(displaced-shift*(0.90+0.20*variant));
+      vec3 ghost = vec3(right.r,c.g*(0.78-0.07*variant)+right.b*(0.10+0.05*variant)+left.g*0.12,left.b);
+      float corridor = fbm(uv*vec2(13.0,5.2)+vec2(-t*(0.15+0.05*variant),u_seed));
+      float spreadMix = 0.22 + 0.12*e + 0.10*variant;
       color = mix(c,ghost,spreadMix);
-      color = mix(color,vec3(0.055,0.06,0.078),0.09+0.09*d+0.05*variant);
-      color += vec3(0.13,0.04,0.19)*outline*(0.08+0.22*e+0.14*variant);
-      color += vec3(0.010,0.10,0.12)*(corridor-0.50)*e*(0.24+0.28*variant);
-      color += (micro-0.5)*e*(0.030+0.050*variant);
-      color += vec3(0.12,0.05,0.15)*gesture*(0.12+0.18*e+0.12*variant);
-      color = mix(color, c, 0.16-0.05*variant);
-      ghostPastUv = uv+flow*(0.0020+e*(0.008+0.009*variant))+vec2(sin(t*(0.42+0.08*variant)),cos(t*(0.31+0.07*variant)))*(0.0015+0.0020*variant);
-      ghostPastUv += vec2(structureField,-structureField)*(0.003+e*0.008);
-      color += vec3(0.18,0.055,0.26)*structureRidge*(0.06+0.10*e);
+      color = mix(color,vec3(0.055,0.06,0.078),0.06+0.06*d+0.03*variant);
+      color += vec3(0.10,0.04,0.16)*outline*(0.04+0.12*e+0.08*variant);
+      color += vec3(0.008,0.070,0.082)*(corridor-0.50)*e*(0.12+0.16*variant);
+      color += (micro-0.5)*e*(0.018+0.024*variant);
+      color += vec3(0.10,0.05,0.13)*gesture*(0.08+0.12*e+0.08*variant);
+      color = mix(color, c, 0.22-0.06*variant);
+      ghostPastUv = uv+flow*(0.0015+e*(0.0050+0.0060*variant))+vec2(sin(t*(0.34+0.06*variant)),cos(t*(0.26+0.05*variant)))*(0.0010+0.0012*variant);
+      ghostPastUv += vec2(structureField,-structureField)*(0.0010+e*0.0035);
+      color += vec3(0.14,0.050,0.20)*structureRidge*(0.03+0.05*e);
       if(variant>0.5) {
-        vec2 denseOffset = vec2(0.018+0.017*e,-0.005-0.011*e);
+        vec2 denseOffset = vec2(0.010+0.010*e,-0.003-0.006*e);
         vec3 secondImage = src(displaced+denseOffset);
-        vec3 doubleExposure = vec3(color.r*0.58+secondImage.b*0.42,
-                                   color.g*0.38+secondImage.g*0.62,secondImage.r);
-        color = mix(color,doubleExposure,0.20+0.22*e);
+        vec3 doubleExposure = vec3(color.r*0.68+secondImage.b*0.32,
+                                   color.g*0.56+secondImage.g*0.44,secondImage.r*0.78+color.b*0.22);
+        color = mix(color,doubleExposure,0.10+0.12*e);
       }
       if(variant>0.5 && u_historyMix>0.5) {
-        vec2 separation = vec2(0.010+0.022*e,0.002+0.008*e);
-        separation *= 0.52+0.48*sin(t*0.23+u_seed);
-        vec3 secondary = past(uv+separation+flow*0.012);
-        color = mix(color,vec3(secondary.b,color.g*0.42+secondary.g*0.58,secondary.r),0.10+0.18*e);
+        vec2 separation = vec2(0.005+0.010*e,0.001+0.004*e);
+        separation *= 0.52+0.48*sin(t*0.21+u_seed);
+        vec3 secondary = past(uv+separation+flow*0.006);
+        color = mix(color,vec3(secondary.b,color.g*0.52+secondary.g*0.48,secondary.r),0.05+0.10*e);
       }
     }
 
@@ -1058,7 +1061,7 @@ function updateTrailUI() {
   $('trailValue').textContent = String(Math.round(state.trail * 100)).padStart(2, '0');
 }
 
-const STRUCTURE_NAMES = ['LAMINA', 'FAULT', 'ORBIT', 'CELLS'];
+const STRUCTURE_NAMES = ['LAMINA', 'SHEAR', 'CURVE', 'FIELD'];
 
 function scheduleAccident(now, first = false) {
   const a = state.accident;
@@ -1102,17 +1105,17 @@ function reseedStructure() {
   state.structure = {
     family: nextFamily,
     angle: (Math.random() * 2 - 1) * Math.PI,
-    scale: 0.75 + Math.random() * 1.15,
-    warp: 0.4 + Math.random() * 1.25,
-    offsetX: (Math.random() * 2 - 1) * 2.7,
-    offsetY: (Math.random() * 2 - 1) * 2.7,
-    bias: (Math.random() * 2 - 1) * 0.4,
-    amount: 1
+    scale: 0.82 + Math.random() * 0.78,
+    warp: 0.18 + Math.random() * 0.62,
+    offsetX: (Math.random() * 2 - 1) * 1.8,
+    offsetY: (Math.random() * 2 - 1) * 1.8,
+    bias: (Math.random() * 2 - 1) * 0.22,
+    amount: 0.30 + Math.random() * 0.24
   };
   resetFeedback();
   state.lastRenderTime = 0;
   scheduleAccident(performance.now(), true);
-  setStatus('STRUCTURE / ' + STRUCTURE_NAMES[nextFamily]);
+  setStatus('FIELD / ' + STRUCTURE_NAMES[nextFamily]);
 }
 
 function bindEvents() {
