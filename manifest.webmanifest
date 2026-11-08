@@ -1,7 +1,7 @@
 {
-  "name": "HIDDEN SIDE — Image Excavator",
-  "short_name": "HIDDEN SIDE",
-  "description": "An image excavator. WebGL materials, latent structures, and temporal residues.",
+  "name": "HIDDEN SIDE V2 — Image Excavator",
+  "short_name": "HIDDEN V2",
+  "description": "Image excavator V2 — WebGL processing and time-based image transformation.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -20,5 +20,6 @@
       "type": "image/png",
       "purpose": "any"
     }
-  ]
+  ],
+  "id": "./hidden-side-v2"
 }

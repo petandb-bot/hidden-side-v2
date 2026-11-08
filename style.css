@@ -31,8 +31,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
   gap: 16px; border-bottom: 1px solid var(--line-soft);
 }
 .brand { display: flex; gap: 12px; align-items: center; min-width: 0; }
-.brand-mark { width: 25px; height: 25px; border: 1px solid #6f657e; border-radius: 50%; position: relative; flex: none; transform: rotate(-24deg); }
-.brand-mark::after { content: ''; display: block; position: absolute; inset: 6px 4px; border: 1px solid #7c6b92; border-radius: 50%; }
+.brand-mark { width: 25px; height: 25px; border-radius: 6px; flex: none; background: url("./icon-192.png") center / cover no-repeat; }
 .brand-copy { display: flex; flex-direction: column; gap: 5px; }
 .brand-copy strong { font-size: 12px; font-weight: 600; letter-spacing: .2em; line-height: 1; white-space: nowrap; }
 .brand-copy small { color: var(--dim); font-size: 8px; letter-spacing: .16em; white-space: nowrap; }
@@ -54,8 +53,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .stage-bottomline span:first-child { max-width: 72%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #recState { color: #e3aea4; }
 .empty-state { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px; gap: 25px; }
-.empty-symbol { width: 47px; height: 47px; position: relative; opacity: .74; }
-.empty-symbol div { position: absolute; border: 1px solid #80718c; border-radius: 50%; transform: rotate(-28deg); }
+.empty-symbol { width: 47px; height: 47px; position: relative; opacity: .82; background: url("./icon-192.png") center / cover no-repeat; border-radius: 11px; }
+.empty-symbol div { display: none; }
 .empty-symbol div:nth-child(1) { inset: 0 4px; }
 .empty-symbol div:nth-child(2) { inset: 9px 1px; }
 .empty-symbol div:nth-child(3) { inset: 18px 12px; }

@@ -6,18 +6,18 @@
   <meta name="theme-color" content="#101010">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="HIDDEN SIDE">
+  <meta name="apple-mobile-web-app-title" content="HIDDEN V2">
   <meta name="description" content="Images beneath images.">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./style.css?v=038">
+  <link rel="icon" href="./icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
+  <link rel="stylesheet" href="./style.css?v=039">
   <title>HIDDEN SIDE — image excavator</title>
 </head>
 <body>
   <main id="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / 0.3.8</small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / V2 · 0.3.9</small></div></div>
       <div class="top-meta"><span id="sourceTag">NO SIGNAL</span><span id="dimensionsTag">—</span></div>
     </header>
 
@@ -77,7 +77,7 @@
     <div class="bottom-note" id="status" role="status" aria-live="polite">LOCAL / GPU</div>
   </main>
 
-  <input id="fileInput" type="file" accept="image/*,video/*,.mov,.mp4,.m4v,.webm" hidden>
+  <input id="fileInput" type="file" accept="image/*,video/*,.heic,.heif,.HEIC,.HEIF,.mov,.mp4,.m4v,.webm" hidden>
   <div id="exportPanel" class="export-overlay" hidden role="dialog" aria-label="Video export">
     <div class="export-sheet">
       <div class="sheet-heading"><span>VIDEO READY</span><button type="button" id="closeExport" aria-label="Close">×</button></div>
@@ -88,6 +88,6 @@
   </div>
   <video id="sourceVideo" muted playsinline webkit-playsinline preload="auto" style="display:none"></video>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./app.js?v=038"></script>
+  <script src="./app.js?v=039"></script>
 </body>
 </html>

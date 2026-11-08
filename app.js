@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.3.8 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.3.9 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -31,7 +31,7 @@ const state = {
   kinetic: 0, kineticTarget: 0, pointerTime: 0, pointerIsDown: false,
   activeURL: null, firstDraw: true, renderingError: false,
   historyReady: false, historyW: 0, historyH: 0,
-  lastRenderTime: 0, sourceGeneration: 0
+  lastRenderTime: 0, sourceGeneration: 0, importGeneration: 0
 };
 
 let gl, canvas, program, sourceTexture, buffer, sourceCanvas, sourceCtx, u;
@@ -215,7 +215,7 @@ const FRAGMENT_SHADER = `
       structureRidge = smoothstep(0.84,0.98,0.5+0.5*cos((soil.y+(softNoise-0.5))*6.6));
     } else if (u_structureA.x < 1.5) {
       float shear = soil.x*0.72 + (foldNoise-0.5)*u_structureB.z*0.95 + softNoise*0.55;
-      structureField = (softNoise-0.5)*0.52 + 0.22*tanh(shear*1.6);
+      structureField = (softNoise-0.5)*0.52 + 0.22*(shear*1.6/(1.0+abs(shear*1.6)));
       structureRidge = exp(-abs(shear)*3.4) * (0.45+0.55*smoothstep(0.38,0.72,softNoise));
     } else if (u_structureA.x < 2.5) {
       float ring = length(soil*vec2(0.92,1.10))+(foldNoise-0.5)*u_structureB.z*0.55;
@@ -680,90 +680,235 @@ function clearPreviousSource() {
   const video=$('sourceVideo');
   video.pause(); video.onended=null; video.removeAttribute('src'); video.load();
   if (state.objectUrl) {URL.revokeObjectURL(state.objectUrl); state.objectUrl=null;}
+  if (typeof ImageBitmap !== 'undefined' && state.element instanceof ImageBitmap) state.element.close();
   state.sourceGeneration++;
   state.type='none'; state.element=null; state.frameDirty=false; state.imageReady=false;
   $('timecode').textContent='';
   resetFeedback();
-  state.videoReady=false; state.renderingError=false;
+  state.videoReady=false;
   state.frameTime=-1; state.touchForce=0; state.touchTarget=0;
   scheduleAccident(performance.now(), true);
   state.kinetic=0; state.kineticTarget=0; state.pointerIsDown=false; state.lastRenderTime=0;
   clearExport();
 }
+// Image loading is transactional: a failed selection must not destroy the current image.
+function withTimeout(promise, ms, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); })
+  ]).finally(() => clearTimeout(timer));
+}
+
+function isHeicCandidate(file) {
+  return /\.(heic|heif)$/i.test(file.name || '') ||
+    /^image\/(heic|heif|heic-sequence|heif-sequence)$/i.test(file.type || '');
+}
+
+async function inspectHeicSignature(file) {
+  if (isHeicCandidate(file)) return true;
+  if (!(file instanceof Blob) || file.size < 12) return false;
+  try {
+    const raw = await file.slice(0, 32).arrayBuffer();
+    const bytes = new Uint8Array(raw);
+    const brand = Array.from(bytes.slice(4, Math.min(32, bytes.length)))
+      .map(byte => String.fromCharCode(byte)).join('').toLowerCase();
+    return brand.startsWith('ftyp') && /heic|heix|hevc|hevx|heim|heis|mif1|msf1/.test(brand);
+  } catch { return false; }
+}
+
+async function decodeWithImageElement(blob) {
+  const objectUrl = URL.createObjectURL(blob);
+  const img = new Image();
+  try {
+    await withTimeout(new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('IMAGE DECODE FAILED'));
+      img.src = objectUrl;
+    }), 25000, 'IMAGE LOAD TIMEOUT');
+    if (!img.naturalWidth || !img.naturalHeight) throw new Error('INVALID IMAGE DIMENSIONS');
+    return { element: img, width: img.naturalWidth, height: img.naturalHeight, objectUrl };
+  } catch (error) {
+    img.onload = null;
+    img.onerror = null;
+    img.removeAttribute('src');
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
+}
+
+async function decodeNativeImage(file) {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await withTimeout(createImageBitmap(file), 20000, 'IMAGE BITMAP TIMEOUT');
+      if (bitmap.width && bitmap.height) {
+        return { element: bitmap, width: bitmap.width, height: bitmap.height, objectUrl: null };
+      }
+      bitmap.close();
+    } catch (error) { console.info('ImageBitmap fallback:', error.message); }
+  }
+  return decodeWithImageElement(file);
+}
+
+let heicDecoderPromise = null;
+function loadHeicDecoder() {
+  if (typeof window.heic2any === 'function') return Promise.resolve(window.heic2any);
+  if (!heicDecoderPromise) {
+    heicDecoderPromise = withTimeout(new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+      script.async = true;
+      script.onload = () => typeof window.heic2any === 'function'
+        ? resolve(window.heic2any) : reject(new Error('HEIC DECODER UNAVAILABLE'));
+      script.onerror = () => reject(new Error('HEIC DECODER NETWORK ERROR'));
+      document.head.appendChild(script);
+    }), 18000, 'HEIC DECODER TIMEOUT').catch(error => {
+      heicDecoderPromise = null;
+      throw error;
+    });
+  }
+  return heicDecoderPromise;
+}
+
+async function decodePhoto(file) {
+  const heic = await inspectHeicSignature(file);
+  try {
+    return await decodeNativeImage(file);
+  } catch (nativeError) {
+    if (!heic) throw nativeError;
+    setStatus('DECODING HEIC');
+    try {
+      const heic2any = await loadHeicDecoder();
+      const result = await withTimeout(heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 }),
+        60000, 'HEIC CONVERSION TIMEOUT');
+      const converted = Array.isArray(result) ? result[0] : result;
+      if (!(converted instanceof Blob)) throw new Error('HEIC CONVERSION FAILED');
+      return decodeNativeImage(converted);
+    } catch (error) {
+      console.warn('HEIC conversion failed:', error);
+      throw new Error('HEIC UNAVAILABLE — TRY JPEG');
+    }
+  }
+}
+
+async function awaitVideoMetadata(video) {
+  await withTimeout(new Promise((resolve, reject) => {
+    if (video.readyState >= 1 && video.videoWidth > 0) { resolve(); return; }
+    const success = () => { cleanup(); resolve(); };
+    const failure = () => { cleanup(); reject(new Error('VIDEO DECODE FAILED')); };
+    const cleanup = () => {
+      video.removeEventListener('loadedmetadata', success);
+      video.removeEventListener('error', failure);
+    };
+    video.addEventListener('loadedmetadata', success);
+    video.addEventListener('error', failure);
+  }), 25000, 'VIDEO LOAD TIMEOUT');
+  if (!video.videoWidth || !video.videoHeight) throw new Error('INVALID VIDEO DIMENSIONS');
+}
+
 async function openFile(file) {
   if (!file || state.isRecording || state.recordStarting) return;
-  if (!gl || !sourceCtx || !program) {setStatus('WEBGL UNAVAILABLE',true);return;}
-  const isVideo = file.type.startsWith('video/') || /\.(mov|mp4|m4v|webm)$/i.test(file.name);
-  const isImage = file.type.startsWith('image/') || /\.(heic|heif|png|jpeg|jpg|webp)$/i.test(file.name);
-  if (!isVideo && !isImage) {setStatus('UNSUPPORTED FILE',true);return;}
-  clearPreviousSource();
-  state.type=isVideo?'video':'photo'; state.fileName=file.name;
-  state.objectUrl=URL.createObjectURL(file);
-  $('assetName').textContent=file.name;
-  $('sourceTag').textContent=isVideo?'VIDEO INPUT':'STILL INPUT';
-  $('emptyState').hidden=true;
-  $('emptyState').style.display='none';
-  $('stage').classList.add('has-source');
-  $('saveButton').disabled=true;
-  $('playButton').disabled=true;
-  $('recordButton').disabled=true;
-  setStatus('LOADING');
+  if (!gl || !sourceCtx || !program || state.renderingError) {
+    setStatus('WEBGL INIT FAILED — RELOAD', true);
+    return;
+  }
+  if (file.size === 0) { setStatus('EMPTY FILE', true); return; }
+  const name = file.name || 'untitled';
+  const isVideo = /^video\//i.test(file.type || '') || /\.(mov|mp4|m4v|webm)$/i.test(name);
+  const isImage = /^image\//i.test(file.type || '') ||
+    /\.(heic|heif|avif|png|jpe?g|webp|gif|bmp|tiff?)$/i.test(name);
+  if (!isVideo && !isImage) { setStatus('UNSUPPORTED MEDIA TYPE', true); return; }
+  const ticket = ++state.importGeneration;
+  setStatus(isVideo ? 'LOADING VIDEO' : 'DECODING IMAGE');
+  let prepared = null;
   try {
-    if (isVideo) {
-      const video=$('sourceVideo');
-      state.element=video;
-      video.loop=true; video.muted=true; video.playsInline=true;
-      video.src=state.objectUrl;
+    if (!isVideo) {
+      prepared = await decodePhoto(file);
+      if (ticket !== state.importGeneration) {
+        if (prepared.objectUrl) URL.revokeObjectURL(prepared.objectUrl);
+        if (typeof ImageBitmap !== 'undefined' && prepared.element instanceof ImageBitmap) prepared.element.close();
+        return;
+      }
+      clearPreviousSource();
+      state.type = 'photo';
+      state.fileName = name;
+      state.element = prepared.element;
+      state.objectUrl = prepared.objectUrl;
+      setSourceDimensions(prepared.width, prepared.height);
+      state.imageReady = true;
+      state.frameDirty = true;
+      $('timecode').textContent = '';
+      $('sourceTag').textContent = 'PHOTO';
+      $('assetName').textContent = name;
+      $('emptyState').hidden = true;
+      $('emptyState').style.display = 'none';
+      $('stage').classList.add('has-source');
+      $('playButton').disabled = true;
+      $('saveButton').disabled = false;
+      $('recordButton').disabled = !canRecord();
+      setStatus(canRecord() ? 'IMAGE READY' : 'IMAGE READY / RECORD UNSUPPORTED');
+    } else {
+      // Keep the existing video element used by playback/recording.
+      clearPreviousSource();
+      state.type = 'video';
+      state.fileName = name;
+      const video = $('sourceVideo');
+      state.element = video;
+      state.objectUrl = URL.createObjectURL(file);
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.src = state.objectUrl;
       video.load();
-      await new Promise((resolve,reject)=>{
-        const timeout=setTimeout(()=>reject(new Error('VIDEO LOAD TIMEOUT')),18000);
-        video.addEventListener('loadedmetadata',()=>{clearTimeout(timeout);resolve();},{once:true});
-        video.addEventListener('error',()=>{clearTimeout(timeout);reject(new Error('VIDEO DECODE FAILED'));},{once:true});
-      });
-      setSourceDimensions(video.videoWidth,video.videoHeight);
-      state.imageReady=true; state.videoReady=true; state.frameDirty=true;
-      video.ontimeupdate=()=>{state.frameDirty=true;};
+      await awaitVideoMetadata(video);
+      if (ticket !== state.importGeneration) return;
+      setSourceDimensions(video.videoWidth, video.videoHeight);
+      state.imageReady = true;
+      state.videoReady = true;
+      state.frameDirty = true;
+      video.ontimeupdate = () => { state.frameDirty = true; };
       if (typeof video.requestVideoFrameCallback === 'function') {
-        const generation=state.sourceGeneration;
-        const onVideoFrame=()=>{
-          if(state.sourceGeneration!==generation || state.type!=='video')return;
-          state.frameDirty=true;
+        const generation = state.sourceGeneration;
+        const onVideoFrame = () => {
+          if (state.sourceGeneration !== generation || state.type !== 'video') return;
+          state.frameDirty = true;
           video.requestVideoFrameCallback(onVideoFrame);
         };
         video.requestVideoFrameCallback(onVideoFrame);
       }
-      video.onended=()=>{if(state.isRecording)stopRecording();};
-      $('timecode').textContent=secondsToClock(0);
-      $('playButton').disabled=false;
-      $('recordButton').disabled=!canRecord();
-      $('saveButton').disabled=false;
-      $('playLabel').textContent='PAUSE'; $('playIcon').textContent='Ⅱ';
+      video.onended = () => { if (state.isRecording) stopRecording(); };
+      $('sourceTag').textContent = 'VIDEO';
+      $('assetName').textContent = name;
+      $('timecode').textContent = secondsToClock(0);
+      $('emptyState').hidden = true;
+      $('emptyState').style.display = 'none';
+      $('stage').classList.add('has-source');
+      $('playButton').disabled = false;
+      $('recordButton').disabled = !canRecord();
+      $('saveButton').disabled = false;
+      $('playLabel').textContent = 'PAUSE';
+      $('playIcon').textContent = 'Ⅱ';
       let started = true;
-      try {await video.play();} catch {
+      try { await video.play(); } catch {
         started = false;
-        $('playLabel').textContent='PLAY'; $('playIcon').textContent='▶';
+        $('playLabel').textContent = 'PLAY';
+        $('playIcon').textContent = '▶';
       }
-      setStatus(started ? 'VIDEO READY' : 'READY / PRESS PLAY');
-    } else {
-      const img=new Image();
-      state.element=img;
-      await new Promise((resolve,reject)=>{
-        img.onload=resolve;
-        img.onerror=()=>reject(new Error('IMAGE DECODE FAILED'));
-        img.src=state.objectUrl;
-      });
-      setSourceDimensions(img.naturalWidth,img.naturalHeight);
-      state.imageReady=true; state.frameDirty=true;
-      $('timecode').textContent='';
-      $('saveButton').disabled=false;
-      $('recordButton').disabled=!canRecord();
-      setStatus(canRecord() ? 'IMAGE READY' : 'IMAGE READY · RECORD UNSUPPORTED');
+      setStatus(started ? 'VIDEO READY' : 'VIDEO READY / PRESS PLAY');
     }
   } catch (error) {
-    setStatus(error.message,true);
-    console.error(error);
-    $('emptyState').style.display='flex'; $('stage').classList.remove('has-source');
-    clearPreviousSource();
+    if (ticket !== state.importGeneration) return;
+    console.error('Import failed:', {name, type:file.type, bytes:file.size}, error);
+    if (isVideo) {
+      clearPreviousSource();
+      $('emptyState').hidden = false;
+      $('emptyState').style.display = 'flex';
+      $('stage').classList.remove('has-source');
+      $('sourceTag').textContent = 'NO SIGNAL';
+      $('assetName').textContent = 'NO SOURCE LOADED';
+      $('timecode').textContent = '';
+    }
+    setStatus(`IMPORT FAILED · ${error.message}`, true);
   }
 }
 

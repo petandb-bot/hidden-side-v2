@@ -1,39 +1,28 @@
-# HIDDEN SIDE v0.3.8
+# HIDDEN SIDE V2 · 0.3.9
 
-GPU-based image excavator for photographs and video. WebGL1 and p5.js 1.11.13.
+A local, GPU-processed image and video excavator built with p5.js 1.11.13 and WebGL1.
 
-## Setup
+## What changed
 
-Deploy all files together to an HTTPS static host (for example, GitHub Pages). Open with iPhone Safari or a desktop browser. For local development, use an HTTP development server. The p5.js runtime is loaded from the CDN, so an internet connection is required for the initial load.
+- Fixed unsupported GLSL ES 1.00 `tanh` in the structure-field shader.
+- Rebuilt photo import around `createImageBitmap` with an HTML Image fallback.
+- Added optional HEIC/HEIF conversion using `heic2any` loaded only when required. The decoder requires internet access on first use.
+- Failed image selections no longer clear the current image.
+- Import errors are shown in the status bar and browser console.
+- Updated the v2 icon, home-screen name, manifest ID, and service worker revision.
 
-## Controls
+## Deploy
 
-- Choose UNDER / NEGATIVE / RELIEF / SEEP / GHOST.
-- Each mode keeps two distinct profiles. GHOST offers a separate TRAIL slider.
-- DEPTH, EROSION and DRIFT influence image reconstruction and animation.
-- Tap or drag on the image to disturb local structure.
-- RESEED regenerates spatial relationships within the image (LAMINA / FAULT / ORBIT / CELLS), not just noise values.
-- QUALITY adjusts preview and recording resolution.
+Place all files in a dedicated HTTPS directory such as `/hidden-side-v2/`, and open its `index.html`.
+Use Safari's "Add to Home Screen" for iOS. Keep the v1 installation in its original folder.
 
-## Recording and export
+## Media
 
-- SAVE IMAGE exports PNG from photos or video frames.
-- RECORD captures the processed WebGL canvas as video, including motion generated from a still photograph.
-- Press STOP to finish; the maximum recording duration is 45 seconds.
-- Chrome prioritizes WebM/VP8; supported Safari versions may choose MP4. Output is silent.
-- Recording runs in real time; actual output frame rate depends on device load.
-- Media is processed locally; files are not uploaded to a server.
+Photos: JPG, PNG, WebP, AVIF when supported by the browser, plus HEIC/HEIF via on-demand conversion when native decoding fails.
+Videos: MP4/MOV/WebM only if the device/browser supports the contained codec.
 
-## Limitations
+Still-image export: PNG. Video export: browser-dependent WebM or MP4, muted, up to 45 seconds. GPU presets: ECO, BALANCED, FINE.
 
-- No embedded source audio, frame-accurate video conversion, or 4K export.
-- High GPU load can reduce recording frame rate on phones.
-- When updating GitHub Pages, refresh cached app resources if the prior version is still shown.
+## Notes
 
-## Version changes
-
-**v0.3.5 — STRUCTURAL RESEED.** Each activation selects a different spatial family and changes its rotation, scale, deformation and offset. The imported image remains close to the v0.3.4 baseline before RESEED. The feedback buffer is reset when RESEED is pressed.
-
-**v0.3.6 — DISTINCT VARIANTS.** UNDER/WILD develops fractured strata; NEGATIVE/BLEACH adds local solarisation and silver/paper thresholds; RELIEF/HALO introduces luminous contours; SEEP/FILM responds with interference coloration; GHOST/DENSE adds a second chromatic apparition. Their alternate profiles retain the quieter original material.
-
-**v0.3.8 — RARE ACCIDENTS.** Four local events can occur without an explicit action: fracture, chemical reversal, displaced double exposure and pigment melt. Events are scheduled roughly 22–53 seconds after importing media and then 37–92 seconds after a completed event. They last around 1.15–2.75 seconds and decay automatically. DRIFT at zero suppresses visible accident intensity. No new UI or render buffers are used.
+The image decoder and recording support vary by browser. HEIC conversion is local to the browser, but loads a third-party decoding script on demand from a CDN. This project does not upload user media to a server. The p5.js runtime is also loaded from a CDN.
