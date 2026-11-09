@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.2 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.4 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -425,45 +425,45 @@ const FRAGMENT_SHADER = `
         color = mix(color,residue,pooling);
       }
     } else {
-      vec2 shift = vec2(0.0012+0.0046*e+0.0016*variant,0.0009+0.0028*e+0.0010*variant);
+      vec2 shift = vec2(0.0014+0.0058*e+0.0019*variant,0.0010+0.0033*e+0.0012*variant);
       shift *= vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.18+0.82,cos(t*(0.17+0.03*variant)+u_seed)*0.18+0.82);
-      vec3 right = src(displaced+shift+flow*(0.0018+0.0024*variant));
-      vec3 left = src(displaced-shift*(0.72+0.14*variant));
+      vec3 right = src(displaced+shift+flow*(0.0022+0.0030*variant));
+      vec3 left = src(displaced-shift*(0.78+0.16*variant));
       vec3 ghost = vec3(right.r,c.g*(0.84-0.05*variant)+right.b*(0.06+0.03*variant)+left.g*0.10,left.b);
       float corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.11+0.04*variant),u_seed));
-      float spreadMix = 0.10 + 0.07*e + 0.05*variant;
+      float spreadMix = 0.14 + 0.10*e + 0.07*variant;
       color = mix(c,ghost,spreadMix);
       color = mix(color,vec3(0.055,0.06,0.078),0.04+0.04*d+0.02*variant);
       color += vec3(0.08,0.03,0.12)*outline*(0.02+0.08*e+0.04*variant);
-      color += vec3(0.008,0.056,0.064)*(corridor-0.50)*e*(0.06+0.08*variant);
+      color += vec3(0.010,0.066,0.074)*(corridor-0.50)*e*(0.07+0.10*variant);
       color += (micro-0.5)*e*(0.010+0.014*variant);
-      color += vec3(0.08,0.04,0.10)*gesture*(0.05+0.08*e+0.04*variant);
-      color = mix(color, c, 0.30-0.06*variant);
-      ghostPastUv = uv+flow*(0.0008+e*(0.0032+0.0035*variant))+vec2(sin(t*(0.26+0.04*variant)),cos(t*(0.22+0.04*variant)))*(0.0006+0.0008*variant);
-      ghostPastUv += vec2(structureField,-structureField)*(0.0006+e*0.0018);
+      color += vec3(0.09,0.04,0.11)*gesture*(0.06+0.10*e+0.05*variant);
+      color = mix(color, c, 0.26-0.06*variant);
+      ghostPastUv = uv+flow*(0.0010+e*(0.0040+0.0044*variant))+vec2(sin(t*(0.28+0.04*variant)),cos(t*(0.24+0.04*variant)))*(0.0008+0.0010*variant);
+      ghostPastUv += vec2(structureField,-structureField)*(0.0008+e*0.0022);
       color += vec3(0.10,0.040,0.16)*structureRidge*(0.015+0.03*e);
       if(variant>0.5) {
-        vec2 denseOffset = vec2(0.006+0.006*e,-0.002-0.004*e);
+        vec2 denseOffset = vec2(0.007+0.008*e,-0.002-0.005*e);
         vec3 secondImage = src(displaced+denseOffset);
         vec3 doubleExposure = vec3(color.r*0.76+secondImage.b*0.24,
                                    color.g*0.64+secondImage.g*0.36,secondImage.r*0.60+color.b*0.40);
-        color = mix(color,doubleExposure,0.04+0.05*e);
+        color = mix(color,doubleExposure,0.05+0.07*e);
       }
       if(variant>0.5 && u_historyMix>0.5) {
-        vec2 separation = vec2(0.003+0.006*e,0.001+0.002*e);
+        vec2 separation = vec2(0.0035+0.007*e,0.001+0.0025*e);
         separation *= 0.52+0.48*sin(t*0.19+u_seed);
         vec3 secondary = past(uv+separation+flow*0.003);
-        color = mix(color,vec3(secondary.b,color.g*0.56+secondary.g*0.44,secondary.r),0.02+0.05*e);
+        color = mix(color,vec3(secondary.b,color.g*0.56+secondary.g*0.44,secondary.r),0.03+0.06*e);
       }
       if(macro>0.5) {
-        vec2 macroShift = vec2(0.006+0.009*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
+        vec2 macroShift = vec2(0.007+0.011*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
         vec3 macroGhost = src(clamp(displaced+macroShift, vec2(0.001), vec2(0.999)));
-        color = mix(color, vec3(macroGhost.r, color.g*0.8+macroGhost.g*0.2, macroGhost.b), 0.03+0.06*e);
+        color = mix(color, vec3(macroGhost.r, color.g*0.78+macroGhost.g*0.22, macroGhost.b), 0.04+0.08*e);
       }
     }
 
 
-    float opticWeight = (0.03 + 0.10*u_drift) * (0.55 + 0.45*variant) * (u_mode>3.5 ? 0.62 : 1.0);
+    float opticWeight = (0.03 + 0.10*u_drift) * (0.55 + 0.45*variant) * (u_mode>3.5 ? 0.74 : 1.0);
     float leakSweep = smoothstep(0.74, 0.98, 0.5 + 0.5*sin(uv.x*1.9 + uv.y*0.8 + t*0.10 + u_seed*0.13));
     vec3 leakColor = mix(vec3(0.10,0.16,0.28), vec3(0.92,0.46,0.20), 0.5 + 0.5*sin(t*0.05 + u_seed*0.07));
     color += leakColor * leakSweep * opticWeight * smoothstep(0.36,0.92,organ);
@@ -472,6 +472,52 @@ const FRAGMENT_SHADER = `
                       c.g,
                       src(clamp(displaced-vec2(0.0,bleedStep.y),vec2(0.001),vec2(0.999))).b);
     color = mix(color, bleed, opticWeight * 0.12 * smoothstep(0.40,0.88,l+outline*0.08));
+
+    float retroWeight = (0.018 + 0.040*e + 0.020*u_drift) * (u_mode>3.5 ? 1.15 : 1.0);
+    float scan = 0.5 + 0.5*sin(uv.y*u_resolution.y*0.78 + t*0.70 + u_seed*0.3);
+    float lineMask = mix(1.0, 0.985 + 0.015*scan, retroWeight);
+    color *= lineMask;
+    float gate = (noise2(vec2(t*0.12, u_seed*0.21)) - 0.5) * retroWeight;
+    color.r += gate*0.030;
+    color.b -= gate*0.022;
+    float phosphor = 0.5 + 0.5*sin(uv.x*u_resolution.x*0.18 + u_seed*0.7);
+    color += vec3(0.015,-0.004,0.010) * (phosphor-0.5) * retroWeight;
+    float vignette = smoothstep(0.98, 0.22, length((uv-0.5)*vec2(1.08, 1.0)));
+    color *= mix(0.95, 1.0, vignette*0.95 + 0.05);
+    float grain = (hash21(floor(uv*u_resolution*0.55) + floor(t*12.0)) - 0.5) * retroWeight;
+    color += vec3(grain) * 0.05;
+
+    if(u_mode < 0.5) {
+      float scanner = 0.5 + 0.5*sin(uv.y*u_resolution.y*0.22 + t*0.24 + u_seed);
+      float dust = smoothstep(0.988, 0.998, hash21(floor(uv*u_resolution*0.18) + floor(t*1.5) + u_seed));
+      color *= 0.992 + 0.016*scanner*retroWeight;
+      color += vec3(0.018,0.014,0.005) * scanner * retroWeight * 0.35;
+      color = mix(color, vec3(0.92,0.86,0.72), dust * retroWeight * 0.10);
+    } else if(u_mode < 1.5) {
+      float paperFlicker = 0.5 + 0.5*sin(t*0.36 + u_seed*0.8);
+      float silverGrain = hash21(floor(uv*u_resolution*0.95) + floor(t*8.0) + u_seed*3.0) - 0.5;
+      color += vec3(silverGrain) * retroWeight * 0.040;
+      color = mix(color, vec3(0.97,0.96,0.92), paperFlicker * retroWeight * 0.03);
+    } else if(u_mode < 2.5) {
+      float phosphorEdge = smoothstep(0.18,0.56,edge) * (0.5 + 0.5*sin(t*0.32 + uv.y*6.0));
+      color += vec3(0.00,0.012,0.020) * phosphorEdge * retroWeight * 0.65;
+      color *= 0.996 + 0.010*(0.5+0.5*sin(uv.y*u_resolution.y*0.55))*retroWeight;
+    } else if(u_mode < 3.5) {
+      vec2 smearStep = vec2(u_texel.x*(2.0 + 5.0*e), 0.0);
+      vec3 tapeBleed = vec3(src(clamp(displaced+smearStep,vec2(0.001),vec2(0.999))).r,
+                            color.g,
+                            src(clamp(displaced-smearStep*1.2,vec2(0.001),vec2(0.999))).b);
+      float drag = smoothstep(0.70,0.94,noise2(vec2(uv.y*12.0, t*0.10+u_seed)));
+      color = mix(color, tapeBleed, retroWeight * 0.08 * drag);
+    } else {
+      vec2 lagStep = vec2(u_texel.x*(2.5 + 6.0*e), 0.0);
+      vec3 lag = vec3(src(clamp(displaced+lagStep,vec2(0.001),vec2(0.999))).r,
+                      color.g,
+                      src(clamp(displaced-lagStep,vec2(0.001),vec2(0.999))).b);
+      float persistence = 0.5 + 0.5*sin(t*0.18 + u_seed + uv.x*2.0);
+      color = mix(color, lag, retroWeight * (0.07 + 0.04*variant) * persistence);
+      color += vec3(0.010,0.024,0.032) * retroWeight * (corridor-0.5) * 0.8;
+    }
 
     if(u_accident.x>0.001) {
       if(u_accident.y<0.5) {
@@ -500,7 +546,7 @@ const FRAGMENT_SHADER = `
     color = color * (0.955 + 0.02*variant) + vec3(0.018 - 0.004*variant);
     // Blend only after grading, so retained frames are not graded repeatedly.
     if (u_mode>3.5 && u_historyMix>0.5) {
-      color = mix(color,past(ghostPastUv),u_trailRetention * (0.78 + 0.06*variant));
+      color = mix(color,past(ghostPastUv),u_trailRetention * (0.86 + 0.09*variant));
     }
     gl_FragColor = vec4(sat3(color),1.0);
   }
@@ -665,7 +711,7 @@ function renderFrame(now, updateHistory=true) {
   state.memoryFactor = Math.pow(0.98, elapsed*24);
   // Ghost decay follows elapsed time; the range is approximately 0.08-3.2 seconds.
   const dense = state.modeVariants[4] === 1;
-  const duration = (0.06 + 1.55 * Math.pow(state.trail, 1.85)) * (dense ? 1.08 : 0.94);
+  const duration = (0.09 + 2.10 * Math.pow(state.trail, 1.85)) * (dense ? 1.14 : 0.98);
   state.trailRetention = Math.min(0.990, Math.exp(-elapsed / duration));
   drawPass(null, canvas.width, canvas.height, now);
   if ((state.mode===0 || state.mode===3 || state.mode===4) && updateHistory) {
