@@ -1,4 +1,4 @@
-# HIDDEN SIDE V2 · 0.4.1
+# HIDDEN SIDE V2 · 0.4.2
 
 A local, GPU-processed image and video excavator built with p5.js 1.11.13 and WebGL1.
 

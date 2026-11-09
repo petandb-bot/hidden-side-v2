@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.1 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.2 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -284,44 +284,45 @@ const FRAGMENT_SHADER = `
     vec2 ghostPastUv = uv;
 
     if (u_mode<0.5) {
-      float shear = noise2(uv*vec2(2.8,6.2)+vec2(t*(0.05+0.02*variant),u_seed*0.23));
-      float fault = smoothstep(0.46-0.03*variant,0.67,shear+outline*(0.05+0.05*variant));
-      float stratum = l + structureField*(0.13+0.09*e) + (organ-0.5)*(0.12+0.23*e+0.08*variant)
-                    + (fault-0.5)*e*(0.12+0.10*variant) + (micro-0.5)*e*(0.02+0.03*variant);
-      stratum += gesture*(0.08+0.08*e+0.06*variant)*(0.5+fault*0.5);
-      float a = smoothstep(0.18-0.04*d,0.44-0.04*d,stratum);
-      float b = smoothstep(0.46-0.03*d,0.69-0.03*d,stratum);
-      float top = smoothstep(0.66-0.03*d,0.84-0.02*d,stratum+medium*(0.05+0.05*variant));
-      vec3 ink = mix(vec3(0.038,0.031,0.070), vec3(0.030,0.018,0.080), variant);
-      vec3 purple = mix(vec3(0.24,0.10,0.40), vec3(0.30,0.08,0.50), variant);
-      vec3 flesh = vec3(0.74,0.61,0.70);
-      vec3 acid = mix(vec3(0.47,0.50,0.12), vec3(0.58,0.62,0.10), variant);
-      color = mix(ink,purple,a);
-      color = mix(color,flesh,b);
-      float vein = top*(smoothstep(0.34,0.73,medium)*(0.48+0.18*variant)+outline*(0.18+0.10*variant));
-      color = mix(color,acid,sat(vein)*(0.55+0.18*variant));
-      color = mix(color,vec3(0.02,0.02,0.03),outline*(0.38+0.12*d+0.12*variant));
-      color += (micro-0.5)*(0.030*e+0.025*variant*e);
-      color = mix(color, vec3(l), 0.08);
-      color = mix(color, c, 0.10-0.04*variant);
+      float bedding = sin(axis.y*(7.0+4.0*d) + medium*1.9 + structureField*1.2);
+      float fractureNoise = noise2(uv*vec2(2.1,5.1)+vec2(t*(0.04+0.01*variant),u_seed*0.19));
+      float fault = smoothstep(0.47-0.02*variant,0.66,fractureNoise+outline*(0.04+0.04*variant));
+      float stratum = l + structureField*(0.10+0.07*e) + (organ-0.5)*(0.10+0.18*e+0.05*variant)
+                    + bedding*(0.06+0.06*d) + (fault-0.5)*e*(0.08+0.07*variant) + (micro-0.5)*e*0.02;
+      stratum += gesture*(0.05+0.06*e)*(0.4+fault*0.6);
+      float a = smoothstep(0.20-0.04*d,0.43-0.04*d,stratum);
+      float b = smoothstep(0.45-0.03*d,0.67-0.03*d,stratum);
+      float top = smoothstep(0.64-0.02*d,0.82-0.02*d,stratum+medium*0.05);
+      vec3 ink = mix(vec3(0.028,0.026,0.038), vec3(0.040,0.028,0.050), variant);
+      vec3 stone = mix(vec3(0.22,0.16,0.18), vec3(0.30,0.20,0.28), variant);
+      vec3 chalk = vec3(0.77,0.69,0.65);
+      vec3 mineral = mix(vec3(0.44,0.42,0.15), vec3(0.54,0.56,0.14), variant);
+      color = mix(ink,stone,a);
+      color = mix(color,chalk,b);
+      float seamLight = top*(smoothstep(0.34,0.72,medium)*0.44 + outline*(0.16+0.08*variant));
+      color = mix(color,mineral,sat(seamLight)*(0.34+0.12*variant));
+      color = mix(color,vec3(0.018,0.018,0.022),outline*(0.34+0.10*d));
+      color += (micro-0.5)*(0.020+0.015*variant)*e;
+      color = mix(color, vec3(l), 0.05);
+      color = mix(color, c, 0.08-0.03*variant);
+      color = mix(color,mineral,structureRidge*(0.09+0.11*e));
       if(macro>0.5) {
-        float shard = smoothstep(0.72,0.93,noise2(floor(uv*(22.0+18.0*d))*0.28+u_seed));
-        color = mix(color, vec3(0.72,0.64,0.68), shard*(0.06+0.14*e));
+        float block = smoothstep(0.70,0.92,noise2(floor(uv*(19.0+14.0*d))*0.32+u_seed));
+        color = mix(color, vec3(0.66,0.60,0.58), block*(0.04+0.10*e));
       }
-      color = mix(color,acid,structureRidge*(0.13+0.19*e));
       if(variant>0.5) {
-        float seamNoise = fbm(axis*vec2(1.10,3.20)+vec2(t*0.05,u_seed*0.11));
-        float seam = smoothstep(0.60,0.79,seamNoise + structureRidge*0.18 + outline*0.06);
-        vec2 slipVec = vec2(0.006+0.016*e,-0.003-0.008*e);
-        vec3 slipSample = src(clamp(displaced + slipVec*seam + flow*0.004, vec2(0.001), vec2(0.999)));
-        color = mix(color, slipSample*vec3(0.86,0.82,0.94), seam*(0.08+0.12*e));
-        color = mix(color, vec3(0.11,0.04,0.18), seam*(0.09+0.10*e));
-        float buriedFault = smoothstep(0.34,0.74,n+structureField*0.18+outline*0.12);
-        color = mix(color,vec3(0.10,0.04,0.20),buriedFault*(0.06+0.12*e));
+        float seamNoise = fbm(axis*vec2(1.0,2.8)+vec2(t*0.04,u_seed*0.10));
+        float seam = smoothstep(0.62,0.79,seamNoise + structureRidge*0.14 + outline*0.05);
+        vec2 slipVec = vec2(0.004+0.012*e,-0.002-0.006*e);
+        vec3 slipSample = src(clamp(displaced + slipVec*seam + flow*0.003, vec2(0.001), vec2(0.999)));
+        color = mix(color, slipSample*vec3(0.90,0.86,0.92), seam*(0.06+0.10*e));
+        color = mix(color, vec3(0.10,0.05,0.16), seam*(0.07+0.08*e));
+        float buriedFault = smoothstep(0.36,0.74,n+structureField*0.14+outline*0.10);
+        color = mix(color,vec3(0.12,0.08,0.16),buriedFault*(0.04+0.08*e));
       }
       if(u_historyMix>0.5) {
-        vec3 remnant = past(uv+flow*(0.002+0.008*e+0.005*variant));
-        color = mix(color,remnant,(0.16+0.12*d+0.10*variant)*u_memory);
+        vec3 remnant = past(uv+flow*(0.0015+0.004*e+0.003*variant));
+        color = mix(color,remnant,(0.08+0.05*d+0.04*variant)*u_memory);
       }
     } else if (u_mode<1.5) {
       vec3 neg = pow(sat3(1.0-c), vec3(0.97+0.06*d-0.05*variant));
@@ -381,83 +382,88 @@ const FRAGMENT_SHADER = `
       }
       color = mix(color, c, 0.12-0.04*variant);
     } else if (u_mode<3.5) {
-      float liquid = l + structureField*(0.14+0.11*e) + (organ-0.52)*(0.24*e+0.12*variant)-outline*(0.09-0.03*variant);
-      liquid += (noise2(field*0.55 + vec2(t*0.05,-t*0.03))-0.5)*e*(0.11+0.12*variant);
-      liquid -= gesture*(0.07+0.11*e);
-      float stain = smoothstep(0.28-0.08*d,0.53,liquid);
-      float crust = smoothstep(0.52-0.03*variant,0.78,liquid+medium*(0.08+0.10*variant));
-      vec3 black = vec3(0.032,0.031,0.040);
-      vec3 lilac = mix(vec3(0.36,0.24,0.54), vec3(0.44,0.28,0.62), variant);
-      vec3 pallid = mix(vec3(0.80,0.75,0.78), vec3(0.86,0.82,0.84), variant);
-      color = mix(black,lilac,stain);
-      color = mix(color,pallid,crust);
-      float seep = smoothstep(0.58-0.05*variant,0.82,organ+outline*(0.14+0.12*variant))*(1.0-smoothstep(0.86,1.0,l));
-      color = mix(color,mix(vec3(0.54,0.56,0.16), vec3(0.66,0.68,0.18), variant),seep*(0.10+0.24*e+0.14*variant));
-      float film = smoothstep(0.45,0.86,organ+medium*0.12);
-      color = mix(color, vec3(0.88,0.80,0.90), variant*film*(0.06+0.08*e));
-      color *= (1.0-(0.24-0.06*variant)*outline);
-      color += (micro-0.5)*(0.05+0.04*variant)*e;
-      color = mix(color, c, 0.10-0.04*variant);
-      color = mix(color,lilac,structureRidge*(0.10+0.13*e));
+      vec2 seepFlow = flow*(0.7+0.6*e) + vec2(noise2(field*0.42+t*0.03)-0.5, noise2(field*0.36-t*0.02)-0.5)*0.35;
+      vec3 wetA = src(clamp(displaced + seepFlow*(0.010+0.016*e), vec2(0.001), vec2(0.999)));
+      vec3 wetB = src(clamp(displaced - seepFlow*(0.008+0.012*e), vec2(0.001), vec2(0.999)));
+      float liquid = l + structureField*(0.10+0.07*e) + (organ-0.50)*(0.18*e+0.10*variant)-outline*(0.05-0.02*variant);
+      liquid += (noise2(field*0.48 + vec2(t*0.04,-t*0.02))-0.5)*e*(0.08+0.10*variant);
+      liquid -= gesture*(0.05+0.09*e);
+      float stain = smoothstep(0.24-0.08*d,0.56,liquid);
+      float bloom = smoothstep(0.46-0.03*variant,0.76,liquid+medium*(0.10+0.08*variant));
+      vec3 black = vec3(0.030,0.030,0.038);
+      vec3 plum = mix(vec3(0.30,0.20,0.42), vec3(0.38,0.24,0.50), variant);
+      vec3 pallid = mix(vec3(0.82,0.79,0.82), vec3(0.88,0.84,0.88), variant);
+      color = mix(black,plum,stain);
+      color = mix(color,pallid,bloom);
+      float seep = smoothstep(0.54-0.04*variant,0.82,organ+outline*(0.10+0.10*variant))*(1.0-smoothstep(0.82,1.0,l));
+      color = mix(color,mix(vec3(0.44,0.48,0.18), vec3(0.58,0.62,0.22), variant),seep*(0.08+0.20*e+0.10*variant));
+      color = mix(color, wetA, 0.08+0.12*e);
+      color = mix(color, wetB, 0.05+0.10*e);
+      float film = smoothstep(0.42,0.84,organ+medium*0.14);
+      color = mix(color, vec3(0.90,0.84,0.92), variant*film*(0.04+0.10*e));
+      color *= (1.0-(0.12-0.03*variant)*outline);
+      color += (micro-0.5)*(0.04+0.03*variant)*e;
+      color = mix(color, c, 0.06-0.02*variant);
+      color = mix(color,plum,structureRidge*(0.08+0.10*e));
       if(variant>0.5) {
-        float thickness = l+0.19*medium+0.12*structureField+0.06*n;
-        float interference = 0.5+0.5*sin(thickness*35.0+t*0.17+u_seed*0.6);
-        float membrane = smoothstep(0.31,0.70,organ)*(1.0-0.48*outline);
-        vec3 iridescent = mix(vec3(0.30,0.42,0.56),vec3(0.78,0.62,0.72),interference);
-        color = mix(color,iridescent,membrane*(0.12+0.24*e));
+        float thickness = l+0.16*medium+0.08*structureField+0.05*n;
+        float interference = 0.5+0.5*sin(thickness*28.0+t*0.15+u_seed*0.5);
+        float membrane = smoothstep(0.30,0.70,organ)*(1.0-0.36*outline);
+        vec3 iridescent = mix(vec3(0.26,0.38,0.52),vec3(0.74,0.60,0.70),interference);
+        color = mix(color,iridescent,membrane*(0.10+0.20*e));
       } else {
-        float capillary = smoothstep(0.27,0.61,outline+abs(structureField)*0.15);
-        color = mix(color,vec3(0.16,0.11,0.20),capillary*(0.12+0.20*e));
+        float capillary = smoothstep(0.24,0.58,outline+abs(structureField)*0.10);
+        color = mix(color,vec3(0.14,0.10,0.18),capillary*(0.10+0.16*e));
       }
       if(macro>0.5) {
-        float puddle = smoothstep(0.60,0.88,noise2(floor(uv*vec2(14.0,14.0))+u_seed*0.4));
-        color = mix(color, vec3(0.88,0.82,0.92), puddle*(0.04+0.10*e));
+        float puddle = smoothstep(0.62,0.88,noise2(floor(uv*vec2(12.0,12.0))+u_seed*0.4));
+        color = mix(color, vec3(0.88,0.84,0.92), puddle*(0.05+0.12*e));
       }
       if(u_historyMix>0.5) {
-        vec3 residue = past(uv+flow*(0.002+0.008*e+0.008*variant));
-        float pooling = (0.18+0.12*d+0.12*variant)*u_memory*(0.90+0.10*outline);
+        vec3 residue = past(uv+flow*(0.003+0.010*e+0.010*variant));
+        float pooling = (0.24+0.14*d+0.12*variant)*u_memory*(0.92+0.08*outline);
         color = mix(color,residue,pooling);
       }
     } else {
-      vec2 shift = vec2(0.0018+0.0080*e+0.0030*variant,0.0012+0.0046*e+0.0018*variant);
-      shift *= vec2(sin(t*(0.22+0.04*variant)+u_seed)*0.26+0.74,cos(t*(0.20+0.04*variant)+u_seed)*0.26+0.74);
-      vec3 right = src(displaced+shift+flow*(0.0030+0.0045*variant));
-      vec3 left = src(displaced-shift*(0.90+0.20*variant));
-      vec3 ghost = vec3(right.r,c.g*(0.78-0.07*variant)+right.b*(0.10+0.05*variant)+left.g*0.12,left.b);
-      float corridor = fbm(uv*vec2(13.0,5.2)+vec2(-t*(0.15+0.05*variant),u_seed));
-      float spreadMix = 0.18 + 0.10*e + 0.08*variant;
+      vec2 shift = vec2(0.0012+0.0046*e+0.0016*variant,0.0009+0.0028*e+0.0010*variant);
+      shift *= vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.18+0.82,cos(t*(0.17+0.03*variant)+u_seed)*0.18+0.82);
+      vec3 right = src(displaced+shift+flow*(0.0018+0.0024*variant));
+      vec3 left = src(displaced-shift*(0.72+0.14*variant));
+      vec3 ghost = vec3(right.r,c.g*(0.84-0.05*variant)+right.b*(0.06+0.03*variant)+left.g*0.10,left.b);
+      float corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.11+0.04*variant),u_seed));
+      float spreadMix = 0.10 + 0.07*e + 0.05*variant;
       color = mix(c,ghost,spreadMix);
-      color = mix(color,vec3(0.055,0.06,0.078),0.06+0.06*d+0.03*variant);
-      color += vec3(0.10,0.04,0.16)*outline*(0.04+0.12*e+0.08*variant);
-      color += vec3(0.010,0.082,0.094)*(corridor-0.50)*e*(0.10+0.13*variant);
-      color += (micro-0.5)*e*(0.018+0.024*variant);
-      color += vec3(0.10,0.05,0.13)*gesture*(0.08+0.12*e+0.08*variant);
-      color = mix(color, c, 0.22-0.06*variant);
-      ghostPastUv = uv+flow*(0.0015+e*(0.0050+0.0060*variant))+vec2(sin(t*(0.34+0.06*variant)),cos(t*(0.26+0.05*variant)))*(0.0010+0.0012*variant);
-      ghostPastUv += vec2(structureField,-structureField)*(0.0010+e*0.0035);
-      color += vec3(0.14,0.050,0.20)*structureRidge*(0.03+0.05*e);
+      color = mix(color,vec3(0.055,0.06,0.078),0.04+0.04*d+0.02*variant);
+      color += vec3(0.08,0.03,0.12)*outline*(0.02+0.08*e+0.04*variant);
+      color += vec3(0.008,0.056,0.064)*(corridor-0.50)*e*(0.06+0.08*variant);
+      color += (micro-0.5)*e*(0.010+0.014*variant);
+      color += vec3(0.08,0.04,0.10)*gesture*(0.05+0.08*e+0.04*variant);
+      color = mix(color, c, 0.30-0.06*variant);
+      ghostPastUv = uv+flow*(0.0008+e*(0.0032+0.0035*variant))+vec2(sin(t*(0.26+0.04*variant)),cos(t*(0.22+0.04*variant)))*(0.0006+0.0008*variant);
+      ghostPastUv += vec2(structureField,-structureField)*(0.0006+e*0.0018);
+      color += vec3(0.10,0.040,0.16)*structureRidge*(0.015+0.03*e);
       if(variant>0.5) {
-        vec2 denseOffset = vec2(0.010+0.010*e,-0.003-0.006*e);
+        vec2 denseOffset = vec2(0.006+0.006*e,-0.002-0.004*e);
         vec3 secondImage = src(displaced+denseOffset);
-        vec3 doubleExposure = vec3(color.r*0.68+secondImage.b*0.32,
-                                   color.g*0.56+secondImage.g*0.44,secondImage.r*0.78+color.b*0.22);
-        color = mix(color,doubleExposure,0.07+0.09*e);
+        vec3 doubleExposure = vec3(color.r*0.76+secondImage.b*0.24,
+                                   color.g*0.64+secondImage.g*0.36,secondImage.r*0.60+color.b*0.40);
+        color = mix(color,doubleExposure,0.04+0.05*e);
       }
       if(variant>0.5 && u_historyMix>0.5) {
-        vec2 separation = vec2(0.005+0.010*e,0.001+0.004*e);
-        separation *= 0.52+0.48*sin(t*0.21+u_seed);
-        vec3 secondary = past(uv+separation+flow*0.006);
-        color = mix(color,vec3(secondary.b,color.g*0.52+secondary.g*0.48,secondary.r),0.04+0.08*e);
+        vec2 separation = vec2(0.003+0.006*e,0.001+0.002*e);
+        separation *= 0.52+0.48*sin(t*0.19+u_seed);
+        vec3 secondary = past(uv+separation+flow*0.003);
+        color = mix(color,vec3(secondary.b,color.g*0.56+secondary.g*0.44,secondary.r),0.02+0.05*e);
       }
       if(macro>0.5) {
-        vec2 macroShift = vec2(0.010+0.014*e, 0.0) * (0.5 + 0.5*sin(t*0.18+u_seed));
+        vec2 macroShift = vec2(0.006+0.009*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
         vec3 macroGhost = src(clamp(displaced+macroShift, vec2(0.001), vec2(0.999)));
-        color = mix(color, vec3(macroGhost.r, color.g*0.7+macroGhost.g*0.3, macroGhost.b), 0.05+0.11*e);
+        color = mix(color, vec3(macroGhost.r, color.g*0.8+macroGhost.g*0.2, macroGhost.b), 0.03+0.06*e);
       }
     }
 
 
-    float opticWeight = (0.03 + 0.10*u_drift) * (0.55 + 0.45*variant);
+    float opticWeight = (0.03 + 0.10*u_drift) * (0.55 + 0.45*variant) * (u_mode>3.5 ? 0.62 : 1.0);
     float leakSweep = smoothstep(0.74, 0.98, 0.5 + 0.5*sin(uv.x*1.9 + uv.y*0.8 + t*0.10 + u_seed*0.13));
     vec3 leakColor = mix(vec3(0.10,0.16,0.28), vec3(0.92,0.46,0.20), 0.5 + 0.5*sin(t*0.05 + u_seed*0.07));
     color += leakColor * leakSweep * opticWeight * smoothstep(0.36,0.92,organ);
@@ -494,7 +500,7 @@ const FRAGMENT_SHADER = `
     color = color * (0.955 + 0.02*variant) + vec3(0.018 - 0.004*variant);
     // Blend only after grading, so retained frames are not graded repeatedly.
     if (u_mode>3.5 && u_historyMix>0.5) {
-      color = mix(color,past(ghostPastUv),u_trailRetention);
+      color = mix(color,past(ghostPastUv),u_trailRetention * (0.78 + 0.06*variant));
     }
     gl_FragColor = vec4(sat3(color),1.0);
   }
@@ -659,7 +665,7 @@ function renderFrame(now, updateHistory=true) {
   state.memoryFactor = Math.pow(0.98, elapsed*24);
   // Ghost decay follows elapsed time; the range is approximately 0.08-3.2 seconds.
   const dense = state.modeVariants[4] === 1;
-  const duration = (0.08 + 2.65 * Math.pow(state.trail, 2.0)) * (dense ? 1.20 : 1.0);
+  const duration = (0.06 + 1.55 * Math.pow(state.trail, 1.85)) * (dense ? 1.08 : 0.94);
   state.trailRetention = Math.min(0.990, Math.exp(-elapsed / duration));
   drawPass(null, canvas.width, canvas.height, now);
   if ((state.mode===0 || state.mode===3 || state.mode===4) && updateHistory) {
