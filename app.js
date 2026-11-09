@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.4 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.5 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -282,6 +282,7 @@ const FRAGMENT_SHADER = `
     float organ = sat(n*0.74+medium*0.26 + structureField*0.05);
     vec3 color = c;
     vec2 ghostPastUv = uv;
+    float corridor = 0.5;
 
     if (u_mode<0.5) {
       float bedding = sin(axis.y*(7.0+4.0*d) + medium*1.9 + structureField*1.2);
@@ -430,7 +431,7 @@ const FRAGMENT_SHADER = `
       vec3 right = src(displaced+shift+flow*(0.0022+0.0030*variant));
       vec3 left = src(displaced-shift*(0.78+0.16*variant));
       vec3 ghost = vec3(right.r,c.g*(0.84-0.05*variant)+right.b*(0.06+0.03*variant)+left.g*0.10,left.b);
-      float corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.11+0.04*variant),u_seed));
+      corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.11+0.04*variant),u_seed));
       float spreadMix = 0.14 + 0.10*e + 0.07*variant;
       color = mix(c,ghost,spreadMix);
       color = mix(color,vec3(0.055,0.06,0.078),0.04+0.04*d+0.02*variant);
@@ -482,7 +483,7 @@ const FRAGMENT_SHADER = `
     color.b -= gate*0.022;
     float phosphor = 0.5 + 0.5*sin(uv.x*u_resolution.x*0.18 + u_seed*0.7);
     color += vec3(0.015,-0.004,0.010) * (phosphor-0.5) * retroWeight;
-    float vignette = smoothstep(0.98, 0.22, length((uv-0.5)*vec2(1.08, 1.0)));
+    float vignette = (1.0 - smoothstep(0.22, 0.98, length((uv-0.5)*vec2(1.08, 1.0))));
     color *= mix(0.95, 1.0, vignette*0.95 + 0.05);
     float grain = (hash21(floor(uv*u_resolution*0.55) + floor(t*12.0)) - 0.5) * retroWeight;
     color += vec3(grain) * 0.05;

@@ -1,8 +1,17 @@
-# HIDDEN SIDE V2 · 0.4.4
+# HIDDEN SIDE V2 · 0.4.5
 
 A local, GPU-processed image and video excavator built with p5.js 1.11.13 and WebGL1.
 
-## What changed
+## v0.4.5 — Stability fix
+
+- Fixed a fragment shader compilation failure in v0.4.4: `corridor` was referenced outside its declaration scope.
+- Corrected the vignette `smoothstep` argument order for defined GLSL behavior.
+- Updated the service worker cache ID and asset query versions to `045` to prevent old files from being reused.
+- Preserved all five processing modes, per-mode variants, CALM / BREAK, RESEED, TRAIL, import, and export controls.
+- Verified both shaders compile and link in a software OpenGL ES context.
+- Verified actual GPU rendering for all 20 combinations of five modes, two variants, and CALM / BREAK at test resolution without GL errors. These are software GPU tests, not an iPhone Safari hardware test.
+
+## Previous changes
 
 - Fixed unsupported GLSL ES 1.00 `tanh` in the structure-field shader.
 - Rebuilt photo import around `createImageBitmap` with an HTML Image fallback.
