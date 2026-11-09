@@ -11,13 +11,13 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon-192.png" type="image/png">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
-  <link rel="stylesheet" href="./style.css?v=045">
+  <link rel="stylesheet" href="./style.css?v=047">
   <title>HIDDEN SIDE — image excavator</title>
 </head>
 <body>
   <main id="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / V2 · 0.4.5</small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / V2 · 0.4.7</small></div></div>
       <div class="top-meta"><span id="sourceTag">NO SIGNAL</span><span id="dimensionsTag">—</span></div>
     </header>
 
@@ -60,6 +60,14 @@
           <button type="button" class="macro-button" data-macro="1" aria-pressed="false">BREAK</button>
         </div>
       </div>
+      <div class="accident-row" id="accidentRow" role="group" aria-label="Accident events">
+        <span class="accident-label">ACCIDENT</span>
+        <div class="accident-strip">
+          <button type="button" class="accident-button" data-accident="off" aria-pressed="false">OFF</button>
+          <button type="button" class="accident-button active" data-accident="on" aria-pressed="true">ON</button>
+        </div>
+        <button id="accidentTuneButton" class="accident-tune-trigger" type="button" aria-haspopup="dialog" aria-controls="accidentPanel">TUNE</button>
+      </div>
       <div class="sliders">
         <label class="parameter"><div class="parameter-info"><span>DEPTH</span><output id="depthValue">50</output></div><input id="depth" type="range" min="0" max="100" value="50"></label>
         <label class="parameter"><div class="parameter-info"><span>EROSION</span><output id="erosionValue">36</output></div><input id="erosion" type="range" min="0" max="100" value="36"></label>
@@ -85,6 +93,19 @@
   </main>
 
   <input id="fileInput" type="file" accept="image/*,video/*,.heic,.heif,.HEIC,.HEIF,.mov,.mp4,.m4v,.webm" hidden>
+  <div id="accidentPanel" class="accident-panel-overlay" hidden role="dialog" aria-label="Accident levels" aria-modal="true">
+    <section class="accident-panel-sheet">
+      <header class="accident-panel-header"><strong>ACCIDENT / LEVELS</strong><button id="closeAccidentPanel" type="button" aria-label="Close accident settings">×</button></header>
+      <p class="accident-panel-note">0 DISABLES A TYPE. TEST PREVIEWS IT WITHOUT WAITING.</p>
+      <div class="accident-level-list">
+        <div class="accident-level-row"><label for="accidentSlider0">FRACTURE</label><input id="accidentSlider0" data-accident-level="0" type="range" min="0" max="100" value="42"><output id="accidentLevel0" for="accidentSlider0">42</output><button type="button" data-accident-test="0">TEST</button></div>
+        <div class="accident-level-row"><label for="accidentSlider1">REVERSAL</label><input id="accidentSlider1" data-accident-level="1" type="range" min="0" max="100" value="48"><output id="accidentLevel1" for="accidentSlider1">48</output><button type="button" data-accident-test="1">TEST</button></div>
+        <div class="accident-level-row"><label for="accidentSlider2">ECHO</label><input id="accidentSlider2" data-accident-level="2" type="range" min="0" max="100" value="55"><output id="accidentLevel2" for="accidentSlider2">55</output><button type="button" data-accident-test="2">TEST</button></div>
+        <div class="accident-level-row"><label for="accidentSlider3">BLEED</label><input id="accidentSlider3" data-accident-level="3" type="range" min="0" max="100" value="36"><output id="accidentLevel3" for="accidentSlider3">36</output><button type="button" data-accident-test="3">TEST</button></div>
+      </div>
+      <p class="accident-panel-foot">AUTO OFF PREVENTS RANDOM EVENTS. TEST IS MANUAL.</p>
+    </section>
+  </div>
   <div id="exportPanel" class="export-overlay" hidden role="dialog" aria-label="Video export">
     <div class="export-sheet">
       <div class="sheet-heading"><span>VIDEO READY</span><button type="button" id="closeExport" aria-label="Close">×</button></div>
@@ -95,6 +116,6 @@
   </div>
   <video id="sourceVideo" muted playsinline webkit-playsinline preload="auto" style="display:none"></video>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./app.js?v=045"></script>
+  <script src="./app.js?v=047"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.5 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.7 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -17,11 +17,12 @@ const MAX_HISTORY_EDGE = 448;
 const state = {
   type: 'none', element: null, fileName: '', objectUrl: null,
   mode: 0, seed: 11.726, depth: 0.50, erosion: 0.36, drift: 0.22,
-  modeVariants: [0,0,0,0,0], macro: 0, trail: 0.55,
+  modeVariants: [0,0,0,0,0], macro: 0, trail: 0.55, accidentEnabled: true,
+  accidentLevels: [0.42, 0.48, 0.55, 0.36],
   structure: { family: 0, angle: 0, scale: 1.0, warp: 0.4,
     offsetX: 0, offsetY: 0, bias: 0, amount: 0 },
   accident: { kind: 0, x: 0.5, y: 0.5, nextAt: 0,
-    startAt: 0, duration: 0, intensity: 0, active: false },
+    startAt: 0, duration: 0, intensity: 0, active: false, manualPreview: false },
   w: 4, h: 4, originalW: 4, originalH: 4,
   renderW: 4, renderH: 4, sourceW: 0, sourceH: 0,
   quality: 'balanced', frameDirty: false, frameTime: -1, imageReady: false,
@@ -253,8 +254,10 @@ const FRAGMENT_SHADER = `
       incident = u_accident.x * exp(-dot(incidentDelta,incidentDelta)*6.0);
     }
     if(u_accident.x>0.001 && u_accident.y<0.5) {
-      float faultGate = smoothstep(0.44,0.52,noise2(uv*vec2(10.0,18.0)+u_seed));
-      displaced.x += (faultGate-0.5)*incident*(0.018+e*0.055);
+      vec2 shardCell = floor((uv + vec2(structureField*0.03, medium*0.03))*vec2(18.0, 24.0));
+      float faultGate = smoothstep(0.78,0.95,noise2(shardCell + u_seed));
+      displaced.x += (faultGate-0.5)*incident*(0.010+e*0.030);
+      displaced.y += (noise2(shardCell*0.7 + 9.1)-0.5)*incident*(0.004+e*0.012);
     }
     if(u_accident.x>0.001 && u_accident.y>=2.5) {
       displaced += vec2(flow.y,-flow.x)*incident*(0.020+e*0.065);
@@ -522,8 +525,10 @@ const FRAGMENT_SHADER = `
 
     if(u_accident.x>0.001) {
       if(u_accident.y<0.5) {
-        float tear = 1.0-smoothstep(0.025,0.15,abs(fract(uv.y*17.0+structureField*2.0+medium*1.6)-0.5));
-        color = mix(color,vec3(0.025,0.010,0.042),incident*tear*(0.35+0.43*e));
+        vec2 tearCell = floor((uv + vec2(structureField*0.04, medium*0.03))*vec2(18.0, 24.0));
+        float tearNoise = noise2(tearCell + u_seed*0.9);
+        float tear = smoothstep(0.80,0.96,tearNoise) * (0.45 + 0.55*outline);
+        color = mix(color,vec3(0.025,0.010,0.042),incident*tear*(0.22+0.28*e));
       } else if(u_accident.y<1.5) {
         float chemical = 1.0-smoothstep(0.05,0.24,abs(l-0.46));
         vec3 reversal = vec3(1.0-color.b,1.0-color.r,0.66+color.g*0.18);
@@ -701,7 +706,9 @@ function drawPass(targetFramebuffer, w, h, now) {
   gl.uniform4f(u.u_structureA,s.family,s.angle,s.scale,s.amount);
   gl.uniform4f(u.u_structureB,s.offsetX,s.offsetY,s.warp,s.bias);
   const incident = state.accident;
-  gl.uniform4f(u.u_accident,incident.intensity,incident.kind,incident.x,incident.y);
+  const typeIndex = Math.max(0, Math.min(3, incident.kind | 0));
+  const typeLevel = state.accidentLevels[typeIndex] ?? 0;
+  gl.uniform4f(u.u_accident,incident.intensity * typeLevel,incident.kind,incident.x,incident.y);
   gl.drawArrays(gl.TRIANGLES,0,6);
 }
 function renderFrame(now, updateHistory=true) {
@@ -1310,6 +1317,102 @@ function setMacro(index) {
   setStatus(index === 0 ? 'CALM RANGE' : 'BREAK RANGE');
 }
 
+function updateAccidentUI() {
+  document.querySelectorAll('.accident-button').forEach(button => {
+    const onButton = button.dataset.accident === 'on';
+    const active = state.accidentEnabled ? onButton : !onButton;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function setAccidentEnabled(enabled) {
+  state.accidentEnabled = !!enabled;
+  const a = state.accident;
+  a.intensity = 0;
+  a.active = false;
+  a.manualPreview = false;
+  if (state.accidentEnabled) {
+    scheduleAccident(performance.now(), true);
+    setStatus('ACCIDENT / ON');
+  } else {
+    a.nextAt = 0;
+    setStatus('ACCIDENT / OFF');
+  }
+  updateAccidentUI();
+  saveAccidentPreferences();
+}
+
+const ACCIDENT_NAMES = ['FRACTURE', 'REVERSAL', 'ECHO', 'BLEED'];
+const ACCIDENT_STORAGE_KEY = 'hidden-side-v2-accident-settings';
+
+function loadAccidentPreferences() {
+  try {
+    const prefs = JSON.parse(localStorage.getItem(ACCIDENT_STORAGE_KEY) || 'null');
+    if (!prefs || typeof prefs !== 'object') return;
+    if (typeof prefs.enabled === 'boolean') state.accidentEnabled = prefs.enabled;
+    if (Array.isArray(prefs.levels) && prefs.levels.length === 4) {
+      state.accidentLevels = prefs.levels.map((level, i) =>
+        Number.isFinite(Number(level)) ? Math.min(1, Math.max(0, Number(level))) : state.accidentLevels[i]);
+    }
+  } catch (_) { /* Storage may be blocked in privacy mode. */ }
+}
+
+function saveAccidentPreferences() {
+  try {
+    localStorage.setItem(ACCIDENT_STORAGE_KEY, JSON.stringify({
+      enabled: state.accidentEnabled,
+      levels: state.accidentLevels
+    }));
+  } catch (_) { /* A blocked storage API must not prevent image processing. */ }
+}
+
+function updateAccidentLevelUI() {
+  document.querySelectorAll('[data-accident-level]').forEach(input => {
+    const kind = Number(input.dataset.accidentLevel);
+    const value = Math.round((state.accidentLevels[kind] || 0) * 100);
+    input.value = String(value);
+    const output = $('accidentLevel' + kind);
+    if (output) output.textContent = String(value).padStart(2, '0');
+  });
+}
+
+function openAccidentPanel() {
+  updateAccidentLevelUI();
+  $('accidentPanel').hidden = false;
+  $('closeAccidentPanel').focus({ preventScroll: true });
+}
+
+function closeAccidentPanel() {
+  $('accidentPanel').hidden = true;
+  $('accidentTuneButton').focus({ preventScroll: true });
+}
+
+// TEST is intentionally independent of spontaneous ON/OFF scheduling.
+// A user-triggered preview is the only exception when ACCIDENT is OFF.
+function previewAccident(kind) {
+  if (!state.imageReady || state.renderingError) {
+    setStatus('IMPORT IMAGE TO TEST', true);
+    return;
+  }
+  if (!Number.isInteger(kind) || kind < 0 || kind >= 4) return;
+  if (state.accidentLevels[kind] <= 0) {
+    setStatus('LEVEL 00 / NO EFFECT');
+    return;
+  }
+  const now = performance.now();
+  const a = state.accident;
+  a.kind = kind;
+  a.x = 0.5;
+  a.y = 0.5;
+  a.startAt = now;
+  a.duration = 3200;
+  a.intensity = 0;
+  a.active = true;
+  a.manualPreview = true;
+  setStatus('TEST / ' + ACCIDENT_NAMES[kind]);
+}
+
 function updateTrailUI() {
   const isGhost = state.mode === 4;
   $('trailControl').hidden = !isGhost;
@@ -1323,30 +1426,63 @@ function scheduleAccident(now, first = false) {
   const a = state.accident;
   a.intensity = 0;
   a.active = false;
+  if (!state.accidentEnabled) {
+    a.nextAt = 0;
+    return;
+  }
   a.nextAt = now + (first ? 22000 + Math.random() * 31000
     : 37000 + Math.random() * 55000);
 }
 
 function updateAccident(now) {
   const a = state.accident;
+  // Manual preview is explicit and works even while automatic events are OFF.
+  if (a.manualPreview) {
+    const progress = (now - a.startAt) / a.duration;
+    if (progress >= 1) {
+      a.manualPreview = false;
+      scheduleAccident(now, !state.accidentEnabled);
+    } else {
+      const attack = Math.min(1, progress / 0.13);
+      const release = Math.pow(Math.max(0, 1 - progress), 0.75);
+      a.intensity = Math.max(0, Math.min(1, attack * release * 0.96));
+    }
+    return;
+  }
+  if (!state.accidentEnabled) {
+    a.intensity = 0;
+    a.active = false;
+    a.nextAt = 0;
+    return;
+  }
+  // A zero-strength type is fully excluded from random selection.
+  const available = state.accidentLevels
+    .map((level, kind) => (level > 0.001 ? kind : -1))
+    .filter(kind => kind >= 0);
+  if (!available.length) {
+    a.intensity = 0;
+    a.active = false;
+    a.nextAt = 0;
+    return;
+  }
   if (!a.nextAt) scheduleAccident(now, true);
   if (!a.active && now >= a.nextAt) {
     a.active = true;
-    a.kind = Math.floor(Math.random() * 4);
+    a.kind = available[Math.floor(Math.random() * available.length)];
     a.x = 0.22 + Math.random() * 0.56;
     a.y = 0.22 + Math.random() * 0.56;
     a.startAt = now;
     a.duration = 1150 + Math.random() * 1600;
   }
   if (a.active) {
-    const progress = (now-a.startAt)/a.duration;
+    const progress = (now - a.startAt) / a.duration;
     if (progress >= 1) {
       scheduleAccident(now);
     } else {
-      const attack = Math.min(1,progress/0.17);
-      const release = Math.pow(1-progress,1.15);
-      const motion = Math.min(1,Math.max(0,state.drift*5));
-      a.intensity = Math.max(0,Math.min(1,attack*release*motion*0.96));
+      const attack = Math.min(1, progress / 0.17);
+      const release = Math.pow(Math.max(0,1 - progress), 1.15);
+      const motion = Math.min(1, Math.max(0, state.drift * 5));
+      a.intensity = Math.max(0, Math.min(1, attack * release * motion * 0.96));
     }
   } else {
     a.intensity = 0;
@@ -1376,6 +1512,7 @@ function reseedStructure() {
 }
 
 function bindEvents() {
+  loadAccidentPreferences();
   ['depth','erosion','drift'].forEach(id=>{
     $(id).addEventListener('input',()=>{
       const val=Number($(id).value);
@@ -1397,6 +1534,33 @@ function bindEvents() {
   });
   document.querySelectorAll('.macro-button').forEach(button=>{
     button.addEventListener('click', ()=> setMacro(Number(button.dataset.macro)));
+  });
+  document.querySelectorAll('.accident-button').forEach(button=>{
+    button.addEventListener('click', ()=> setAccidentEnabled(button.dataset.accident === 'on'));
+  });
+  $('accidentTuneButton').addEventListener('click', openAccidentPanel);
+  $('closeAccidentPanel').addEventListener('click', closeAccidentPanel);
+  $('accidentPanel').addEventListener('pointerdown', event => {
+    if (event.target === $('accidentPanel')) closeAccidentPanel();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !$('accidentPanel').hidden) closeAccidentPanel();
+  });
+  document.querySelectorAll('[data-accident-level]').forEach(input => {
+    input.addEventListener('input', () => {
+      const kind = Number(input.dataset.accidentLevel);
+      state.accidentLevels[kind] = Math.max(0, Math.min(1, Number(input.value) / 100));
+      $('accidentLevel' + kind).textContent = String(Math.round(state.accidentLevels[kind] * 100)).padStart(2, '0');
+      saveAccidentPreferences();
+      if (state.accidentLevels[kind] === 0 && state.accident.active && state.accident.kind === kind) {
+        state.accident.intensity = 0;
+        state.accident.active = false;
+        state.accident.manualPreview = false;
+      }
+    });
+  });
+  document.querySelectorAll('[data-accident-test]').forEach(button => {
+    button.addEventListener('click', () => previewAccident(Number(button.dataset.accidentTest)));
   });
   $('renderQuality').addEventListener('change',e=>changeQuality(e.target.value));
   $('importButton').addEventListener('click',()=>{if(!state.isRecording && !state.recordStarting)$('fileInput').click();});
@@ -1441,6 +1605,8 @@ function bindEvents() {
   });
   setMode(0);
   updateVariantUI();
+  updateAccidentUI();
+  updateAccidentLevelUI();
   $('trail').value = Math.round(state.trail * 100);
   updateTrailUI();
   $('renderQuality').value=state.quality;

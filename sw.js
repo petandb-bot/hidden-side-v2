@@ -1,6 +1,6 @@
-const VERSION = 'hidden-side-v2-045';
+const VERSION = 'hidden-side-v2-047';
 const ASSETS = [
-  './', './index.html', './app.js?v=045', './style.css?v=045',
+  './', './index.html', './app.js?v=047', './style.css?v=047',
   './icon-180.png', './icon-192.png', './icon-512.png', './manifest.webmanifest'
 ];
 self.addEventListener('install', event => {

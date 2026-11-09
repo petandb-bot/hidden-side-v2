@@ -75,6 +75,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .macro-button { min-height: 30px; background: transparent; border: 1px solid #353331; color: #8a8782; font-size: 9px; letter-spacing: .15em; padding: 8px 10px; }
 .macro-button.active { border-color: #8b7c92; color:#ddd4e4; background: rgba(128,116,144,0.08); }
 .macro-button:hover { color:#c8c3cb; border-color:#5a515f; }
+
+.accident-row { display:flex; align-items:center; gap:10px; margin-top: 11px; }
+.accident-label { flex:none; color: var(--dim); font-size: 9px; letter-spacing: .15em; }
+.accident-strip { flex:1 1 auto; display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+.accident-button { min-height: 30px; background: transparent; border: 1px solid #353331; color: #8a8782; font-size: 9px; letter-spacing: .15em; padding: 8px 10px; }
+.accident-button.active { border-color: #8b7c92; color:#ddd4e4; background: rgba(128,116,144,0.08); }
+.accident-button:hover { color:#c8c3cb; border-color:#5a515f; }
 .variant-strip { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .trail-control { flex: 0 0 42%; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
 .trail-control[hidden] { display: none !important; }
@@ -155,3 +162,23 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
   .actionbar { padding-top: 7px; }
   .action { min-height: 40px; }
 }
+
+
+/* Accident detail panel floats over the lower portion of the app to preserve stage space. */
+.accident-tune-trigger { flex:none; min-height:30px; padding:6px 10px; border:1px solid #4a454f; background:#1b191c; color:#bdb0c8; font-size:9px; letter-spacing:.13em; }
+.accident-tune-trigger:hover { border-color:#8b7c92; }
+.accident-panel-overlay { position:fixed; z-index:45; inset:0; background:rgba(0,0,0,.24); display:flex; justify-content:center; align-items:flex-end; }
+.accident-panel-sheet { width:min(100%, 640px); max-height:min(63dvh, 440px); overflow-y:auto; overscroll-behavior:contain; border:1px solid #514a55; background:#191719; padding:18px 18px max(18px,env(safe-area-inset-bottom)); box-shadow:0 -8px 45px #0007; }
+.accident-panel-header { display:flex; justify-content:space-between; align-items:center; font-size:11px; letter-spacing:.16em; color:#e0d9e2; }
+.accident-panel-header button { border:0; background:none; color:#d1c6d4; font-size:25px; line-height:1; padding:2px 6px; }
+.accident-panel-note,.accident-panel-foot { font-size:9px; line-height:1.5; letter-spacing:.09em; color:#958d97; }
+.accident-panel-note { margin:12px 0 14px; }
+.accident-panel-foot { margin:14px 0 0; }
+.accident-level-list { display:flex; flex-direction:column; gap:9px; }
+.accident-level-row { display:grid; grid-template-columns:minmax(84px, 1fr) minmax(80px, 2fr) 30px 49px; gap:10px; align-items:center; min-height:36px; }
+.accident-level-row label { font-size:10px; letter-spacing:.09em; color:#cbc1ce; }
+.accident-level-row input { min-width:0; width:100%; accent-color:#ae98c1; cursor:pointer; }
+.accident-level-row output { text-align:right; font-size:11px; font-variant-numeric:tabular-nums; color:#d2bbdf; }
+.accident-level-row button { min-height:29px; border:1px solid #655a6c; background:#222025; color:#cfc3d5; font-size:9px; letter-spacing:.09em; }
+.accident-level-row button:hover { border-color:#ab96bf; }
+@media (max-width:480px) { .accident-panel-sheet { padding:14px 14px max(18px,env(safe-area-inset-bottom)); } .accident-level-row { grid-template-columns:80px minmax(66px,1fr) 24px 45px; gap:8px; } .accident-row { gap:7px; } .accident-tune-trigger { padding:6px 8px; } }
