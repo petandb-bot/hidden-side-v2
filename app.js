@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.0 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.1 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -17,7 +17,7 @@ const MAX_HISTORY_EDGE = 448;
 const state = {
   type: 'none', element: null, fileName: '', objectUrl: null,
   mode: 0, seed: 11.726, depth: 0.50, erosion: 0.36, drift: 0.22,
-  modeVariants: [0,0,0,0,0], trail: 0.55,
+  modeVariants: [0,0,0,0,0], macro: 0, trail: 0.55,
   structure: { family: 0, angle: 0, scale: 1.0, warp: 0.4,
     offsetX: 0, offsetY: 0, bias: 0, amount: 0 },
   accident: { kind: 0, x: 0.5, y: 0.5, nextAt: 0,
@@ -152,6 +152,7 @@ const FRAGMENT_SHADER = `
   uniform float u_seed;
   uniform float u_mode;
   uniform float u_variant;
+  uniform float u_macro;
   uniform float u_depth;
   uniform float u_erosion;
   uniform float u_drift;
@@ -197,6 +198,7 @@ const FRAGMENT_SHADER = `
     float d = u_depth;
     float e = u_erosion;
     float variant = u_variant;
+    float macro = u_macro;
     float t = u_time * (0.62 + u_drift * 0.70);
     float kinetic = sat(u_kinetic);
     vec2 q = uv - vec2(0.5);
@@ -262,6 +264,13 @@ const FRAGMENT_SHADER = `
       float breakup = step(0.980-0.024*e-0.020*variant,hash21(vec2(row,floor(t*0.5)+u_seed)));
       displaced.x += breakup*(noise2(vec2(row,t+u_seed))-0.5)*e*(0.022+0.020*variant);
     }
+    if(macro>0.5) {
+      vec2 blockGrid = floor(uv*(18.0+28.0*d))/(18.0+28.0*d);
+      float blockNoise = noise2(blockGrid*vec2(8.0,11.0)+vec2(t*0.10,u_seed*0.08));
+      float shearNoise = noise2(blockGrid*vec2(13.0,6.0)-vec2(t*0.08,u_seed*0.04));
+      displaced += vec2((blockNoise-0.5),(shearNoise-0.5))*(0.003+0.010*e);
+      displaced += vec2(flow.y,-flow.x)*(blockNoise-0.5)*(0.004+0.012*e);
+    }
     displaced = clamp(displaced,vec2(0.001),vec2(0.999));
     vec3 c = src(displaced);
     float l = lum(c);
@@ -295,15 +304,20 @@ const FRAGMENT_SHADER = `
       color += (micro-0.5)*(0.030*e+0.025*variant*e);
       color = mix(color, vec3(l), 0.08);
       color = mix(color, c, 0.10-0.04*variant);
+      if(macro>0.5) {
+        float shard = smoothstep(0.72,0.93,noise2(floor(uv*(22.0+18.0*d))*0.28+u_seed));
+        color = mix(color, vec3(0.72,0.64,0.68), shard*(0.06+0.14*e));
+      }
       color = mix(color,acid,structureRidge*(0.13+0.19*e));
       if(variant>0.5) {
-        float fracture = abs(fract((axis.y+flow.x*0.28)*11.0+structureField*1.2)-0.5);
-        float openSeam = 1.0-smoothstep(0.015,0.09,fracture);
-        float exposure = openSeam*(0.30+0.70*outline)*(0.20+0.75*e);
-        color = mix(color,vec3(0.83,0.73,0.70),exposure*0.62);
-        color -= vec3(0.19,0.06,0.23)*exposure*0.35;
-        float buriedFault = smoothstep(0.30,0.73,n+outline*0.22);
-        color = mix(color,vec3(0.12,0.032,0.21),buriedFault*(0.11+0.17*e));
+        float seamNoise = fbm(axis*vec2(1.10,3.20)+vec2(t*0.05,u_seed*0.11));
+        float seam = smoothstep(0.60,0.79,seamNoise + structureRidge*0.18 + outline*0.06);
+        vec2 slipVec = vec2(0.006+0.016*e,-0.003-0.008*e);
+        vec3 slipSample = src(clamp(displaced + slipVec*seam + flow*0.004, vec2(0.001), vec2(0.999)));
+        color = mix(color, slipSample*vec3(0.86,0.82,0.94), seam*(0.08+0.12*e));
+        color = mix(color, vec3(0.11,0.04,0.18), seam*(0.09+0.10*e));
+        float buriedFault = smoothstep(0.34,0.74,n+structureField*0.18+outline*0.12);
+        color = mix(color,vec3(0.10,0.04,0.20),buriedFault*(0.06+0.12*e));
       }
       if(u_historyMix>0.5) {
         vec3 remnant = past(uv+flow*(0.002+0.008*e+0.005*variant));
@@ -334,6 +348,11 @@ const FRAGMENT_SHADER = `
         color = mix(color, vec3(0.985,0.985,0.97), bleach*(0.10+0.18*e));
         color = mix(color, vec3(0.14,0.16,0.22), solar*(0.08+0.12*e));
       }
+      if(macro>0.5) {
+        vec2 offsetA = vec2((noise2(floor(uv*vec2(18.0,12.0))+u_seed)-0.5)*(0.004+0.012*e), 0.0);
+        vec3 glitchA = src(clamp(displaced+offsetA, vec2(0.001), vec2(0.999)));
+        color = mix(color, vec3(glitchA.r, color.g, glitchA.b), 0.06+0.10*e);
+      }
     } else if (u_mode<2.5) {
       float angle = t*(0.13+0.04*variant)+u_seed*0.07;
       vec3 lightDirection = normalize(vec3(-0.58*cos(angle)-0.20,
@@ -355,6 +374,10 @@ const FRAGMENT_SHADER = `
         float prism = smoothstep(0.18,0.46,edge) * smoothstep(0.42,0.86,light);
         color += vec3(0.14,0.10,0.20) * prism * (0.05+0.11*e);
         color += vec3(0.06,0.11,0.16) * prism * (0.04+0.08*d);
+      }
+      if(macro>0.5) {
+        float snap = smoothstep(0.62,0.90,noise2(floor(uv*vec2(20.0,14.0))+u_seed));
+        color += vec3(0.10,0.10,0.12) * snap * (0.04+0.08*e);
       }
       color = mix(color, c, 0.12-0.04*variant);
     } else if (u_mode<3.5) {
@@ -385,6 +408,10 @@ const FRAGMENT_SHADER = `
       } else {
         float capillary = smoothstep(0.27,0.61,outline+abs(structureField)*0.15);
         color = mix(color,vec3(0.16,0.11,0.20),capillary*(0.12+0.20*e));
+      }
+      if(macro>0.5) {
+        float puddle = smoothstep(0.60,0.88,noise2(floor(uv*vec2(14.0,14.0))+u_seed*0.4));
+        color = mix(color, vec3(0.88,0.82,0.92), puddle*(0.04+0.10*e));
       }
       if(u_historyMix>0.5) {
         vec3 residue = past(uv+flow*(0.002+0.008*e+0.008*variant));
@@ -421,6 +448,11 @@ const FRAGMENT_SHADER = `
         separation *= 0.52+0.48*sin(t*0.21+u_seed);
         vec3 secondary = past(uv+separation+flow*0.006);
         color = mix(color,vec3(secondary.b,color.g*0.52+secondary.g*0.48,secondary.r),0.04+0.08*e);
+      }
+      if(macro>0.5) {
+        vec2 macroShift = vec2(0.010+0.014*e, 0.0) * (0.5 + 0.5*sin(t*0.18+u_seed));
+        vec3 macroGhost = src(clamp(displaced+macroShift, vec2(0.001), vec2(0.999)));
+        color = mix(color, vec3(macroGhost.r, color.g*0.7+macroGhost.g*0.3, macroGhost.b), 0.05+0.11*e);
       }
     }
 
@@ -512,7 +544,7 @@ function initGL() {
   u = {};
   for (const name of ['u_source','u_history','u_historyMix','u_memory','u_trailRetention',
       'u_texel','u_resolution','u_pointer','u_touch','u_kinetic',
-      'u_time','u_seed','u_mode','u_variant','u_depth','u_erosion','u_drift',
+      'u_time','u_seed','u_mode','u_variant','u_macro','u_depth','u_erosion','u_drift',
       'u_structureA','u_structureB','u_accident']) {
     u[name] = gl.getUniformLocation(program,name);
   }
@@ -608,6 +640,7 @@ function drawPass(targetFramebuffer, w, h, now) {
   gl.uniform1f(u.u_seed,state.seed);
   gl.uniform1f(u.u_mode,state.mode);
   gl.uniform1f(u.u_variant, state.modeVariants[state.mode] || 0);
+  gl.uniform1f(u.u_macro, state.macro || 0);
   gl.uniform1f(u.u_depth,state.depth);
   gl.uniform1f(u.u_erosion,state.erosion);
   gl.uniform1f(u.u_drift,state.drift);
@@ -1180,10 +1213,11 @@ function setMode(mode) {
   });
   updateVariantUI();
   updateTrailUI();
+  updateMacroUI();
 }
 
 const VARIANT_LABELS = [
-  ['QUIET', 'WILD'],
+  ['QUIET', 'SPLIT'],
   ['PRINT', 'BLEACH'],
   ['STONE', 'HALO'],
   ['STAIN', 'FILM'],
@@ -1205,6 +1239,22 @@ function setVariant(index) {
   state.modeVariants[state.mode] = index;
   resetFeedback();
   updateVariantUI();
+}
+
+
+function updateMacroUI() {
+  document.querySelectorAll('.macro-button').forEach((button, index) => {
+    const active = (state.macro || 0) === index;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function setMacro(index) {
+  state.macro = index;
+  resetFeedback();
+  updateMacroUI();
+  setStatus(index === 0 ? 'CALM RANGE' : 'BREAK RANGE');
 }
 
 function updateTrailUI() {
@@ -1291,6 +1341,9 @@ function bindEvents() {
   });
   document.querySelectorAll('.variant-button').forEach(button=>{
     button.addEventListener('click', ()=> setVariant(Number(button.dataset.variant)));
+  });
+  document.querySelectorAll('.macro-button').forEach(button=>{
+    button.addEventListener('click', ()=> setMacro(Number(button.dataset.macro)));
   });
   $('renderQuality').addEventListener('change',e=>changeQuality(e.target.value));
   $('importButton').addEventListener('click',()=>{if(!state.isRecording && !state.recordStarting)$('fileInput').click();});

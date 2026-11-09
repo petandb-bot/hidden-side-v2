@@ -11,13 +11,13 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon-192.png" type="image/png">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
-  <link rel="stylesheet" href="./style.css?v=040">
+  <link rel="stylesheet" href="./style.css?v=041">
   <title>HIDDEN SIDE — image excavator</title>
 </head>
 <body>
   <main id="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / V2 · 0.4.0</small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / V2 · 0.4.1</small></div></div>
       <div class="top-meta"><span id="sourceTag">NO SIGNAL</span><span id="dimensionsTag">—</span></div>
     </header>
 
@@ -52,6 +52,13 @@
           <span class="trail-heading"><span>TRAIL</span><output id="trailValue">55</output></span>
           <input id="trail" type="range" min="0" max="100" value="55" aria-label="Ghost trail length">
         </label>
+      </div>
+      <div class="macro-row" id="macroRow" role="group" aria-label="Processing range">
+        <span class="macro-label">RANGE</span>
+        <div class="macro-strip">
+          <button type="button" class="macro-button active" data-macro="0" aria-pressed="true">CALM</button>
+          <button type="button" class="macro-button" data-macro="1" aria-pressed="false">BREAK</button>
+        </div>
       </div>
       <div class="sliders">
         <label class="parameter"><div class="parameter-info"><span>DEPTH</span><output id="depthValue">50</output></div><input id="depth" type="range" min="0" max="100" value="50"></label>
@@ -88,6 +95,6 @@
   </div>
   <video id="sourceVideo" muted playsinline webkit-playsinline preload="auto" style="display:none"></video>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./app.js?v=040"></script>
+  <script src="./app.js?v=041"></script>
 </body>
 </html>

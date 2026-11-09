@@ -68,6 +68,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .plain-button:hover { color: #c3bfc0; }
 .mode-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .variant-row { display: flex; align-items: center; gap: 16px; margin-top: 11px; margin-bottom: 11px; }
+
+.macro-row { display:flex; align-items:center; gap:10px; margin-top: 11px; }
+.macro-label { flex:none; color: var(--dim); font-size: 9px; letter-spacing: .15em; }
+.macro-strip { flex:1 1 auto; display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+.macro-button { min-height: 30px; background: transparent; border: 1px solid #353331; color: #8a8782; font-size: 9px; letter-spacing: .15em; padding: 8px 10px; }
+.macro-button.active { border-color: #8b7c92; color:#ddd4e4; background: rgba(128,116,144,0.08); }
+.macro-button:hover { color:#c8c3cb; border-color:#5a515f; }
 .variant-strip { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .trail-control { flex: 0 0 42%; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
 .trail-control[hidden] { display: none !important; }
