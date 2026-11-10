@@ -1,8 +1,8 @@
-# HIDDEN SIDE V2 · 0.4.8
+# HIDDEN SIDE V2 · 0.4.10
 
 A local, GPU-processed image and video excavator built with p5.js 1.11.13 and WebGL1.
 
-## v0.4.8 — Stability fix
+## v0.4.10 — Under/Seep break redesign
 
 - Fixed a fragment shader compilation failure in v0.4.4: `corridor` was referenced outside its declaration scope.
 - Corrected the vignette `smoothstep` argument order for defined GLSL behavior.

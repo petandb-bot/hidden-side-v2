@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.8 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.10 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -279,11 +279,26 @@ const FRAGMENT_SHADER = `
       displaced.x += breakup*(noise2(vec2(row,t+u_seed))-0.5)*e*(0.022+0.020*variant);
     }
     if(macro>0.5) {
-      vec2 blockGrid = floor(uv*(18.0+28.0*d))/(18.0+28.0*d);
-      float blockNoise = noise2(blockGrid*vec2(8.0,11.0)+vec2(t*0.10,u_seed*0.08));
-      float shearNoise = noise2(blockGrid*vec2(13.0,6.0)-vec2(t*0.08,u_seed*0.04));
-      displaced += vec2((blockNoise-0.5),(shearNoise-0.5))*(0.003+0.010*e);
-      displaced += vec2(flow.y,-flow.x)*(blockNoise-0.5)*(0.004+0.012*e);
+      if(u_mode < 0.5) {
+        float slipNoise = fbm(axis*vec2(1.4,4.8) + vec2(t*0.06, u_seed*0.10));
+        float slipMask = smoothstep(0.60,0.82, slipNoise + structureRidge*0.18 + outline*0.05);
+        vec2 slipVec = vec2(noise2(uv*vec2(3.0,8.0)+vec2(t*0.05,u_seed*0.12))-0.5,
+                            noise2(uv*vec2(2.6,6.4)-vec2(t*0.04,u_seed*0.09))-0.5);
+        displaced += slipVec*(0.004+0.012*e)*slipMask;
+        displaced += vec2(flow.y,-flow.x)*(slipNoise-0.5)*(0.003+0.008*e)*slipMask;
+      } else if(u_mode < 3.5 && u_mode >= 2.5) {
+        float poolNoise = fbm(field*0.42 + vec2(t*0.04, -t*0.03) + vec2(u_seed*0.05, u_seed*0.08));
+        float poolMask = smoothstep(0.52,0.84, poolNoise + medium*0.12 - outline*0.06);
+        vec2 eddy = vec2(noise2(field*0.36+vec2(t*0.03,u_seed*0.07))-0.5,
+                         noise2(field*0.30-vec2(t*0.025,u_seed*0.06))-0.5);
+        displaced += eddy*(0.002+0.006*e)*poolMask;
+      } else {
+        vec2 blockGrid = floor(uv*(18.0+28.0*d))/(18.0+28.0*d);
+        float blockNoise = noise2(blockGrid*vec2(8.0,11.0)+vec2(t*0.10,u_seed*0.08));
+        float shearNoise = noise2(blockGrid*vec2(13.0,6.0)-vec2(t*0.08,u_seed*0.04));
+        displaced += vec2((blockNoise-0.5),(shearNoise-0.5))*(0.003+0.010*e);
+        displaced += vec2(flow.y,-flow.x)*(blockNoise-0.5)*(0.004+0.012*e);
+      }
     }
     displaced = clamp(displaced,vec2(0.001),vec2(0.999));
     vec3 c = src(displaced);
@@ -322,8 +337,14 @@ const FRAGMENT_SHADER = `
       color = mix(color, c, 0.08-0.03*variant);
       color = mix(color,mineral,structureRidge*(0.09+0.11*e));
       if(macro>0.5) {
-        float block = smoothstep(0.70,0.92,noise2(floor(uv*(19.0+14.0*d))*0.32+u_seed));
-        color = mix(color, vec3(0.66,0.60,0.58), block*(0.04+0.10*e));
+        float crumbleNoise = fbm(axis*vec2(1.5,4.4)+vec2(t*0.05,u_seed*0.13));
+        float crumble = smoothstep(0.60,0.82, crumbleNoise + structureRidge*0.18);
+        vec2 crumbleShift = vec2(0.003+0.010*e,-0.001-0.004*e) * crumble;
+        vec3 crumbleSample = src(clamp(displaced + crumbleShift, vec2(0.001), vec2(0.999)));
+        color = mix(color, crumbleSample*vec3(0.88,0.84,0.82), crumble*(0.05+0.10*e));
+        color = mix(color, vec3(0.10,0.07,0.08), crumble*(0.04+0.10*e));
+        float exposed = smoothstep(0.44,0.82,outline + medium*0.16 + crumbleNoise*0.10);
+        color = mix(color, mineral, exposed*(0.05+0.12*e));
       }
       if(variant>0.5) {
         float seamNoise = fbm(axis*vec2(1.0,2.8)+vec2(t*0.04,u_seed*0.10));
@@ -431,8 +452,15 @@ const FRAGMENT_SHADER = `
         color = mix(color,vec3(0.14,0.10,0.18),capillary*(0.10+0.16*e));
       }
       if(macro>0.5) {
-        float puddle = smoothstep(0.62,0.88,noise2(floor(uv*vec2(12.0,12.0))+u_seed*0.4));
-        color = mix(color, vec3(0.88,0.84,0.92), puddle*(0.05+0.12*e));
+        float hollowNoise = fbm(field*0.46 + vec2(t*0.04,-t*0.03) + vec2(u_seed*0.08,u_seed*0.04));
+        float hollow = smoothstep(0.54,0.84, hollowNoise + organ*0.10 - outline*0.05);
+        float pulse = 0.5 + 0.5*sin(t*0.34 + medium*4.2 + u_seed*0.6);
+        float hollowMask = hollow*(0.40 + 0.60*pulse)*(1.0-0.32*outline);
+        vec3 shadowTint = mix(vec3(0.08,0.06,0.10), vec3(0.12,0.08,0.16), variant);
+        color = mix(color, shadowTint, hollowMask*(0.08+0.16*e));
+        vec3 soak = src(clamp(displaced + seepFlow*(0.012+0.018*e)*hollowMask, vec2(0.001), vec2(0.999)));
+        color = mix(color, soak, hollowMask*(0.04+0.08*e));
+        color = mix(color, vec3(0.90,0.86,0.92), hollowMask*(0.03+0.06*variant));
       }
       if(u_historyMix>0.5) {
         vec3 residue = past(uv+flow*(0.003+0.010*e+0.010*variant));
@@ -440,54 +468,62 @@ const FRAGMENT_SHADER = `
         color = mix(color,residue,pooling);
       }
     } else {
-      vec2 chromaShift = vec2(0.0011+0.0038*e+0.0014*variant,0.0009+0.0022*e+0.0010*variant);
-      chromaShift *= vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.22+0.78,cos(t*(0.17+0.03*variant)+u_seed)*0.20+0.80);
-      vec2 colorDrift = flow*(0.0022+0.0042*e+0.0020*variant) + vec2(-flow.y, flow.x)*(0.0010+0.0020*e);
+      vec2 chromaShift = vec2(0.0009+0.0027*e+0.0011*variant,0.0008+0.0018*e+0.0009*variant);
+      chromaShift *= vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.16+0.84,cos(t*(0.17+0.03*variant)+u_seed)*0.15+0.85);
+      vec2 colorDrift = flow*(0.0018+0.0034*e+0.0016*variant) + vec2(-flow.y, flow.x)*(0.0008+0.0016*e);
+      vec2 meltShift = flow*(0.006+0.010*e+0.003*variant);
       vec3 nearA = src(displaced + chromaShift + colorDrift);
-      vec3 nearB = src(displaced - chromaShift*0.72 - colorDrift*0.55);
-      vec3 nearC = src(displaced + vec2(-chromaShift.y, chromaShift.x)*0.68 + flow*0.0026);
-      corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.11+0.04*variant),u_seed));
-      float spreadMix = 0.11 + 0.08*e + 0.05*variant;
-      vec3 chromaVeil = vec3(nearA.r*0.84 + c.r*0.16,
-                             c.g*0.58 + nearB.g*0.24 + nearC.b*0.18,
-                             nearB.b*0.74 + c.b*0.26);
-      color = mix(c, chromaVeil, spreadMix);
-      float lightBloom = smoothstep(0.44,0.92,l+outline*0.12);
-      float edgeBloom = smoothstep(0.12,0.48,edge);
-      color += vec3(0.10,0.03,0.14) * lightBloom * (0.02 + 0.07*e + 0.04*variant);
-      color += vec3(0.02,0.06,0.08) * (corridor-0.50) * e * (0.07+0.09*variant);
-      color += vec3(0.00,0.04,0.08) * edgeBloom * (0.02+0.05*variant);
-      color += (micro-0.5)*e*(0.008+0.012*variant);
-      color += vec3(0.08,0.04,0.11)*gesture*(0.05+0.08*e+0.04*variant);
-      color = mix(color, vec3(0.050,0.054,0.074), 0.03+0.03*d+0.02*variant);
-      color = mix(color, c, 0.36-0.06*variant);
-      ghostPastUv = uv + colorDrift*(0.58+0.12*variant)
-                      + vec2(sin(t*(0.23+0.04*variant)),cos(t*(0.21+0.04*variant)))*(0.0007+0.0010*variant);
-      ghostPastUv += vec2(structureField,-structureField)*(0.0010+e*0.0027);
-      color += vec3(0.09,0.04,0.15)*structureRidge*(0.018+0.035*e);
+      vec3 nearB = src(displaced - chromaShift*0.64 - colorDrift*0.48);
+      vec3 nearC = src(displaced + vec2(-chromaShift.y, chromaShift.x)*0.56 + flow*0.0020);
+      vec3 meltA = src(clamp(displaced + meltShift, vec2(0.001), vec2(0.999)));
+      vec3 meltB = src(clamp(displaced - meltShift*0.72, vec2(0.001), vec2(0.999)));
+      vec3 meltC = src(clamp(displaced + vec2(meltShift.y, -meltShift.x)*0.58, vec2(0.001), vec2(0.999)));
+      vec3 melted = (c + meltA + meltB + meltC) * 0.25;
+      corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.10+0.03*variant),u_seed));
+      float spreadMix = 0.07 + 0.05*e + 0.04*variant;
+      float meltMix = 0.08 + 0.12*e + 0.05*variant;
+      vec3 chromaVeil = vec3(nearA.r*0.82 + melted.r*0.18,
+                             c.g*0.62 + nearB.g*0.22 + nearC.b*0.16,
+                             nearB.b*0.72 + melted.b*0.28);
+      color = mix(c, melted, meltMix);
+      color = mix(color, chromaVeil, spreadMix);
+      float lightBloom = smoothstep(0.44,0.92,l+outline*0.10);
+      float edgeBloom = smoothstep(0.12,0.46,edge);
+      float silhouetteHold = 1.0 - edgeBloom*0.36;
+      color += vec3(0.10,0.03,0.14) * lightBloom * (0.018 + 0.050*e + 0.032*variant);
+      color += vec3(0.02,0.06,0.08) * (corridor-0.50) * e * (0.06+0.08*variant);
+      color += vec3(0.00,0.04,0.08) * edgeBloom * (0.018+0.040*variant);
+      color += (micro-0.5)*e*(0.006+0.010*variant);
+      color += vec3(0.08,0.04,0.11)*gesture*(0.04+0.06*e+0.035*variant);
+      color = mix(color, vec3(0.050,0.054,0.074), 0.025+0.025*d+0.02*variant);
+      color = mix(color, c, (0.46-0.06*variant) * silhouetteHold + edgeBloom*0.12);
+      ghostPastUv = uv + colorDrift*(0.42+0.10*variant)
+                      + vec2(sin(t*(0.22+0.04*variant)),cos(t*(0.20+0.04*variant)))*(0.0005+0.0008*variant);
+      ghostPastUv += vec2(structureField,-structureField)*(0.0007+e*0.0019);
+      color += vec3(0.09,0.04,0.15)*structureRidge*(0.014+0.028*e);
       if(u_historyMix>0.5) {
-        vec2 memoryShiftA = colorDrift*(0.90+0.18*variant) + vec2(chromaShift.x,-chromaShift.y);
-        vec2 memoryShiftB = vec2(-chromaShift.x*0.75, chromaShift.y*0.58) + flow*0.0025;
+        vec2 memoryShiftA = colorDrift*(0.62+0.12*variant) + vec2(chromaShift.x*0.7,-chromaShift.y*0.7);
+        vec2 memoryShiftB = vec2(-chromaShift.x*0.58, chromaShift.y*0.44) + flow*0.0018;
         vec3 memoryA = past(uv + memoryShiftA);
         vec3 memoryB = past(uv - memoryShiftB);
-        vec3 memoryColor = vec3(memoryA.r,
-                                color.g*0.72 + memoryB.g*0.28,
-                                memoryB.b*0.76 + memoryA.b*0.24);
-        float memoryBlend = (0.04 + 0.10*e + 0.04*variant) * (0.35 + 0.65*edgeBloom);
+        vec3 memoryColor = vec3(memoryA.r*0.84 + color.r*0.16,
+                                color.g*0.80 + memoryB.g*0.20,
+                                memoryB.b*0.70 + memoryA.b*0.16 + color.b*0.14);
+        float memoryBlend = (0.02 + 0.05*e + 0.03*variant) * (0.22 + 0.50*lightBloom + 0.28*edgeBloom);
         color = mix(color, memoryColor, memoryBlend);
       }
       if(variant>0.5) {
-        vec2 denseOffset = vec2(0.0045+0.0060*e,-0.0016-0.0038*e);
+        vec2 denseOffset = vec2(0.0032+0.0048*e,-0.0012-0.0030*e);
         vec3 secondImage = src(displaced+denseOffset);
-        vec3 doubleExposure = vec3(color.r*0.82+secondImage.b*0.18,
-                                   color.g*0.74+secondImage.g*0.26,
-                                   secondImage.r*0.36+color.b*0.64);
-        color = mix(color,doubleExposure,0.04+0.05*e);
+        vec3 doubleExposure = vec3(color.r*0.86+secondImage.b*0.14,
+                                   color.g*0.78+secondImage.g*0.22,
+                                   secondImage.r*0.28+color.b*0.72);
+        color = mix(color,doubleExposure,0.025+0.04*e);
       }
       if(macro>0.5) {
-        vec2 macroShift = vec2(0.005+0.008*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
+        vec2 macroShift = vec2(0.004+0.006*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
         vec3 macroGhost = src(clamp(displaced+macroShift, vec2(0.001), vec2(0.999)));
-        color = mix(color, vec3(macroGhost.r, color.g*0.84+macroGhost.g*0.16, macroGhost.b), 0.03+0.06*e);
+        color = mix(color, vec3(macroGhost.r, color.g*0.88+macroGhost.g*0.12, macroGhost.b), 0.02+0.05*e);
       }
     }
 
@@ -577,7 +613,7 @@ const FRAGMENT_SHADER = `
     color = color * (0.955 + 0.02*variant) + vec3(0.018 - 0.004*variant);
     // Blend only after grading, so retained frames are not graded repeatedly.
     if (u_mode>3.5 && u_historyMix>0.5) {
-      color = mix(color,past(ghostPastUv),u_trailRetention * (0.74 + 0.08*variant));
+      color = mix(color,past(ghostPastUv),u_trailRetention * (0.46 + 0.06*variant));
     }
     gl_FragColor = vec4(sat3(color),1.0);
   }
@@ -742,10 +778,10 @@ function renderFrame(now, updateHistory=true) {
   const elapsed = state.lastRenderTime > 0 ? Math.max(1/60, Math.min(0.15, now-state.lastRenderTime)) : 1/24;
   state.lastRenderTime = now;
   state.memoryFactor = Math.pow(0.98, elapsed*24);
-  // Ghost decay follows elapsed time directly; the range is approximately 0.18-5.4 seconds.
+  // Ghost decay follows elapsed time directly; tuned for smoother color persistence over hard afterimages.
   const dense = state.modeVariants[4] === 1;
-  const duration = (0.18 + 4.40 * Math.pow(state.trail, 1.90)) * (dense ? 1.18 : 1.0);
-  state.trailRetention = Math.min(0.997, Math.exp(-elapsed / duration));
+  const duration = (0.16 + 3.20 * Math.pow(state.trail, 1.80)) * (dense ? 1.10 : 0.96);
+  state.trailRetention = Math.min(0.992, Math.exp(-elapsed / duration));
   drawPass(null, canvas.width, canvas.height, now);
   if ((state.mode===0 || state.mode===3 || state.mode===4) && updateHistory) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, feedbackFramebuffer);
