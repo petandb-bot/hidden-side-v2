@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.7 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.8 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -225,11 +225,22 @@ const FRAGMENT_SHADER = `
       float curve = sin(ring*5.1 + softNoise*2.2);
       structureField = curve*0.20 + (softNoise-0.5)*0.26;
       structureRidge = smoothstep(0.80,0.97,0.5+0.5*cos(ring*5.1));
-    } else {
+    } else if (u_structureA.x < 3.5) {
       vec2 cell = floor(soil*1.35);
       float zone = noise2(cell+u_seed*0.12);
       structureField = (zone-0.5)*0.48 + (softNoise-0.5)*0.22;
       structureRidge = smoothstep(0.70,0.92,softNoise) * (0.45+0.55*zone);
+    } else if (u_structureA.x < 4.5) {
+      float radius = length(soil*vec2(0.92,1.08));
+      float lensCore = 1.0 / (1.0 + radius*radius*(1.8 + u_structureB.z*0.7));
+      float lensRipple = sin(radius*(7.2 + u_structureB.z*2.8) - softNoise*2.4 + foldNoise*1.7);
+      structureField = (lensCore-0.40)*0.72 + lensRipple*0.14 + (softNoise-0.5)*0.16;
+      structureRidge = smoothstep(0.66,0.94,lensCore + lensRipple*0.10);
+    } else {
+      float stream = sin(soil.x*(4.2 + u_structureB.z*2.1) + softNoise*2.6 + foldNoise*1.4);
+      float driftNoise = noise2(vec2(soil.y*1.6 + t*0.03, soil.x*0.52 + u_seed*0.14));
+      structureField = stream*0.24 + (driftNoise-0.5)*0.24 + (softNoise-0.5)*0.18;
+      structureRidge = smoothstep(0.80,0.98,0.5+0.5*stream) * smoothstep(0.34,0.78,driftNoise);
     }
     structureField = clamp(structureField,-1.0,1.0)*u_structureA.w;
     structureRidge *= 0.72*u_structureA.w;
@@ -429,45 +440,59 @@ const FRAGMENT_SHADER = `
         color = mix(color,residue,pooling);
       }
     } else {
-      vec2 shift = vec2(0.0014+0.0058*e+0.0019*variant,0.0010+0.0033*e+0.0012*variant);
-      shift *= vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.18+0.82,cos(t*(0.17+0.03*variant)+u_seed)*0.18+0.82);
-      vec3 right = src(displaced+shift+flow*(0.0022+0.0030*variant));
-      vec3 left = src(displaced-shift*(0.78+0.16*variant));
-      vec3 ghost = vec3(right.r,c.g*(0.84-0.05*variant)+right.b*(0.06+0.03*variant)+left.g*0.10,left.b);
+      vec2 chromaShift = vec2(0.0011+0.0038*e+0.0014*variant,0.0009+0.0022*e+0.0010*variant);
+      chromaShift *= vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.22+0.78,cos(t*(0.17+0.03*variant)+u_seed)*0.20+0.80);
+      vec2 colorDrift = flow*(0.0022+0.0042*e+0.0020*variant) + vec2(-flow.y, flow.x)*(0.0010+0.0020*e);
+      vec3 nearA = src(displaced + chromaShift + colorDrift);
+      vec3 nearB = src(displaced - chromaShift*0.72 - colorDrift*0.55);
+      vec3 nearC = src(displaced + vec2(-chromaShift.y, chromaShift.x)*0.68 + flow*0.0026);
       corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.11+0.04*variant),u_seed));
-      float spreadMix = 0.14 + 0.10*e + 0.07*variant;
-      color = mix(c,ghost,spreadMix);
-      color = mix(color,vec3(0.055,0.06,0.078),0.04+0.04*d+0.02*variant);
-      color += vec3(0.08,0.03,0.12)*outline*(0.02+0.08*e+0.04*variant);
-      color += vec3(0.010,0.066,0.074)*(corridor-0.50)*e*(0.07+0.10*variant);
-      color += (micro-0.5)*e*(0.010+0.014*variant);
-      color += vec3(0.09,0.04,0.11)*gesture*(0.06+0.10*e+0.05*variant);
-      color = mix(color, c, 0.26-0.06*variant);
-      ghostPastUv = uv+flow*(0.0010+e*(0.0040+0.0044*variant))+vec2(sin(t*(0.28+0.04*variant)),cos(t*(0.24+0.04*variant)))*(0.0008+0.0010*variant);
-      ghostPastUv += vec2(structureField,-structureField)*(0.0008+e*0.0022);
-      color += vec3(0.10,0.040,0.16)*structureRidge*(0.015+0.03*e);
-      if(variant>0.5) {
-        vec2 denseOffset = vec2(0.007+0.008*e,-0.002-0.005*e);
-        vec3 secondImage = src(displaced+denseOffset);
-        vec3 doubleExposure = vec3(color.r*0.76+secondImage.b*0.24,
-                                   color.g*0.64+secondImage.g*0.36,secondImage.r*0.60+color.b*0.40);
-        color = mix(color,doubleExposure,0.05+0.07*e);
+      float spreadMix = 0.11 + 0.08*e + 0.05*variant;
+      vec3 chromaVeil = vec3(nearA.r*0.84 + c.r*0.16,
+                             c.g*0.58 + nearB.g*0.24 + nearC.b*0.18,
+                             nearB.b*0.74 + c.b*0.26);
+      color = mix(c, chromaVeil, spreadMix);
+      float lightBloom = smoothstep(0.44,0.92,l+outline*0.12);
+      float edgeBloom = smoothstep(0.12,0.48,edge);
+      color += vec3(0.10,0.03,0.14) * lightBloom * (0.02 + 0.07*e + 0.04*variant);
+      color += vec3(0.02,0.06,0.08) * (corridor-0.50) * e * (0.07+0.09*variant);
+      color += vec3(0.00,0.04,0.08) * edgeBloom * (0.02+0.05*variant);
+      color += (micro-0.5)*e*(0.008+0.012*variant);
+      color += vec3(0.08,0.04,0.11)*gesture*(0.05+0.08*e+0.04*variant);
+      color = mix(color, vec3(0.050,0.054,0.074), 0.03+0.03*d+0.02*variant);
+      color = mix(color, c, 0.36-0.06*variant);
+      ghostPastUv = uv + colorDrift*(0.58+0.12*variant)
+                      + vec2(sin(t*(0.23+0.04*variant)),cos(t*(0.21+0.04*variant)))*(0.0007+0.0010*variant);
+      ghostPastUv += vec2(structureField,-structureField)*(0.0010+e*0.0027);
+      color += vec3(0.09,0.04,0.15)*structureRidge*(0.018+0.035*e);
+      if(u_historyMix>0.5) {
+        vec2 memoryShiftA = colorDrift*(0.90+0.18*variant) + vec2(chromaShift.x,-chromaShift.y);
+        vec2 memoryShiftB = vec2(-chromaShift.x*0.75, chromaShift.y*0.58) + flow*0.0025;
+        vec3 memoryA = past(uv + memoryShiftA);
+        vec3 memoryB = past(uv - memoryShiftB);
+        vec3 memoryColor = vec3(memoryA.r,
+                                color.g*0.72 + memoryB.g*0.28,
+                                memoryB.b*0.76 + memoryA.b*0.24);
+        float memoryBlend = (0.04 + 0.10*e + 0.04*variant) * (0.35 + 0.65*edgeBloom);
+        color = mix(color, memoryColor, memoryBlend);
       }
-      if(variant>0.5 && u_historyMix>0.5) {
-        vec2 separation = vec2(0.0035+0.007*e,0.001+0.0025*e);
-        separation *= 0.52+0.48*sin(t*0.19+u_seed);
-        vec3 secondary = past(uv+separation+flow*0.003);
-        color = mix(color,vec3(secondary.b,color.g*0.56+secondary.g*0.44,secondary.r),0.03+0.06*e);
+      if(variant>0.5) {
+        vec2 denseOffset = vec2(0.0045+0.0060*e,-0.0016-0.0038*e);
+        vec3 secondImage = src(displaced+denseOffset);
+        vec3 doubleExposure = vec3(color.r*0.82+secondImage.b*0.18,
+                                   color.g*0.74+secondImage.g*0.26,
+                                   secondImage.r*0.36+color.b*0.64);
+        color = mix(color,doubleExposure,0.04+0.05*e);
       }
       if(macro>0.5) {
-        vec2 macroShift = vec2(0.007+0.011*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
+        vec2 macroShift = vec2(0.005+0.008*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
         vec3 macroGhost = src(clamp(displaced+macroShift, vec2(0.001), vec2(0.999)));
-        color = mix(color, vec3(macroGhost.r, color.g*0.78+macroGhost.g*0.22, macroGhost.b), 0.04+0.08*e);
+        color = mix(color, vec3(macroGhost.r, color.g*0.84+macroGhost.g*0.16, macroGhost.b), 0.03+0.06*e);
       }
     }
 
 
-    float opticWeight = (0.03 + 0.10*u_drift) * (0.55 + 0.45*variant) * (u_mode>3.5 ? 0.74 : 1.0);
+    float opticWeight = (0.03 + 0.10*u_drift) * (0.55 + 0.45*variant) * (u_mode>3.5 ? 0.88 : 1.0);
     float leakSweep = smoothstep(0.74, 0.98, 0.5 + 0.5*sin(uv.x*1.9 + uv.y*0.8 + t*0.10 + u_seed*0.13));
     vec3 leakColor = mix(vec3(0.10,0.16,0.28), vec3(0.92,0.46,0.20), 0.5 + 0.5*sin(t*0.05 + u_seed*0.07));
     color += leakColor * leakSweep * opticWeight * smoothstep(0.36,0.92,organ);
@@ -552,7 +577,7 @@ const FRAGMENT_SHADER = `
     color = color * (0.955 + 0.02*variant) + vec3(0.018 - 0.004*variant);
     // Blend only after grading, so retained frames are not graded repeatedly.
     if (u_mode>3.5 && u_historyMix>0.5) {
-      color = mix(color,past(ghostPastUv),u_trailRetention * (0.86 + 0.09*variant));
+      color = mix(color,past(ghostPastUv),u_trailRetention * (0.74 + 0.08*variant));
     }
     gl_FragColor = vec4(sat3(color),1.0);
   }
@@ -717,10 +742,10 @@ function renderFrame(now, updateHistory=true) {
   const elapsed = state.lastRenderTime > 0 ? Math.max(1/60, Math.min(0.15, now-state.lastRenderTime)) : 1/24;
   state.lastRenderTime = now;
   state.memoryFactor = Math.pow(0.98, elapsed*24);
-  // Ghost decay follows elapsed time; the range is approximately 0.08-3.2 seconds.
+  // Ghost decay follows elapsed time directly; the range is approximately 0.18-5.4 seconds.
   const dense = state.modeVariants[4] === 1;
-  const duration = (0.09 + 2.10 * Math.pow(state.trail, 1.85)) * (dense ? 1.14 : 0.98);
-  state.trailRetention = Math.min(0.990, Math.exp(-elapsed / duration));
+  const duration = (0.18 + 4.40 * Math.pow(state.trail, 1.90)) * (dense ? 1.18 : 1.0);
+  state.trailRetention = Math.min(0.997, Math.exp(-elapsed / duration));
   drawPass(null, canvas.width, canvas.height, now);
   if ((state.mode===0 || state.mode===3 || state.mode===4) && updateHistory) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, feedbackFramebuffer);
@@ -949,13 +974,37 @@ async function openFile(file) {
       $('recordButton').disabled = !canRecord();
       setStatus(canRecord() ? 'IMAGE READY' : 'IMAGE READY / RECORD UNSUPPORTED');
     } else {
-      // Keep the existing video element used by playback/recording.
+      const probeUrl = URL.createObjectURL(file);
+      const probe = document.createElement('video');
+      probe.preload = 'metadata';
+      probe.muted = true;
+      probe.playsInline = true;
+      probe.src = probeUrl;
+      probe.load();
+      try {
+        await awaitVideoMetadata(probe);
+      } catch (error) {
+        probe.removeAttribute('src');
+        probe.load();
+        URL.revokeObjectURL(probeUrl);
+        throw error;
+      }
+      const videoWidth = probe.videoWidth;
+      const videoHeight = probe.videoHeight;
+      probe.pause();
+      probe.removeAttribute('src');
+      probe.load();
+      if (ticket !== state.importGeneration) {
+        URL.revokeObjectURL(probeUrl);
+        return;
+      }
+      // Commit only after the incoming video has decoded successfully.
       clearPreviousSource();
       state.type = 'video';
       state.fileName = name;
       const video = $('sourceVideo');
       state.element = video;
-      state.objectUrl = URL.createObjectURL(file);
+      state.objectUrl = probeUrl;
       video.loop = true;
       video.muted = true;
       video.playsInline = true;
@@ -963,7 +1012,7 @@ async function openFile(file) {
       video.load();
       await awaitVideoMetadata(video);
       if (ticket !== state.importGeneration) return;
-      setSourceDimensions(video.videoWidth, video.videoHeight);
+      setSourceDimensions(videoWidth, videoHeight);
       state.imageReady = true;
       state.videoReady = true;
       state.frameDirty = true;
