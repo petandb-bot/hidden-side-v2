@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.11 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.12 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -10,8 +10,13 @@ const PERFORMANCE = {
   balanced: { preview: 720, video: 960, fps: 24 },
   fine: { preview: 960, video: 1280, fps: 30 }
 };
-const MAX_PHOTO_SOURCE = 2048;
-const MAX_HISTORY_EDGE = 448;
+const OUTPUT_PRESETS = {
+  standard: { photo: 2048, video: 1280, history: 640, bitrate: 6000000 },
+  high: { photo: 3072, video: 1920, history: 960, bitrate: 10000000 },
+  max: { photo: 4096, video: 2560, history: 1280, bitrate: 16000000 }
+};
+const PREVIEW_PHOTO_SOURCE = 2048;
+const PREVIEW_HISTORY_EDGE = 448;
 
 
 const state = {
@@ -25,7 +30,8 @@ const state = {
     startAt: 0, duration: 0, intensity: 0, active: false, manualPreview: false },
   w: 4, h: 4, originalW: 4, originalH: 4,
   renderW: 4, renderH: 4, sourceW: 0, sourceH: 0,
-  quality: 'balanced', frameDirty: false, frameTime: -1, imageReady: false,
+  quality: 'balanced', outputQuality: 'high', renderPurpose: 'preview',
+  frameDirty: false, frameTime: -1, imageReady: false,
   videoReady: false, isRecording: false, recordStarting: false, recorder: null, stream: null,
   recordStartedAt: 0, recordDuration: 0, recordedBlob: null, recordedName: '',
   pointer: [0.5, 0.5], touchForce: 0, touchTarget: 0,
@@ -698,9 +704,18 @@ function sizeForLimit(w, h, edge) {
 function previewSize() {
   return sizeForLimit(state.originalW, state.originalH, PERFORMANCE[state.quality].preview);
 }
+function outputPreset() {
+  return OUTPUT_PRESETS[state.outputQuality] || OUTPUT_PRESETS.high;
+}
 function exportSize() {
-  const edge = state.type === 'video' ? PERFORMANCE[state.quality].video : MAX_PHOTO_SOURCE;
+  const preset = outputPreset();
+  const edge = state.type === 'video' ? preset.video : preset.photo;
   return sizeForLimit(state.originalW, state.originalH, edge);
+}
+function historyEdgeForCurrentRender() {
+  if (state.renderPurpose === 'preview') return PREVIEW_HISTORY_EDGE;
+  const preset = outputPreset();
+  return preset.history;
 }
 function resetFeedback() {
   state.historyReady = false;
@@ -719,7 +734,7 @@ function initFeedback() {
   if (feedbackFramebuffer) gl.deleteFramebuffer(feedbackFramebuffer);
   feedbackTextures = [];
   feedbackFramebuffer = gl.createFramebuffer();
-  [state.historyW, state.historyH] = sizeForLimit(canvas.width, canvas.height, MAX_HISTORY_EDGE);
+  [state.historyW, state.historyH] = sizeForLimit(canvas.width, canvas.height, historyEdgeForCurrentRender());
   for (let i=0; i<2; i++) {
     const tex = gl.createTexture();
     gl.activeTexture(gl.TEXTURE1);
@@ -805,7 +820,7 @@ function setRenderSize(w,h,clearHistory=false) {
 }
 function setSourceDimensions(w,h) {
   state.originalW=w;state.originalH=h;
-  const [sw,sh]=state.type==='photo' ? sizeForLimit(w,h,MAX_PHOTO_SOURCE) : previewSize();
+  const [sw,sh]=state.type==='photo' ? sizeForLimit(w,h,PREVIEW_PHOTO_SOURCE) : previewSize();
   allocateSourceTexture(sw,sh);
   const [pw,ph]=previewSize();
   setRenderSize(pw,ph,true);
@@ -819,7 +834,7 @@ function changeVideoSourceSize(w,h) {
 function changeQuality(q) {
   if (!PERFORMANCE[q] || state.isRecording || state.recordStarting) return;
   state.quality=q;
-  frameRate(PERFORMANCE[q].fps);
+  frameRate(PERFORMANCE[state.quality].fps);
   if(state.imageReady){
     const [w,h]=previewSize();
     if(state.type==='video')changeVideoSourceSize(w,h);
@@ -828,6 +843,13 @@ function changeQuality(q) {
     if(state.type==='photo')state.frameDirty=true;
   }
   setStatus(`QUALITY / ${q.toUpperCase()}`);
+}
+function changeOutputQuality(q) {
+  if (!OUTPUT_PRESETS[q] || state.isRecording || state.recordStarting) return;
+  state.outputQuality = q;
+  saveOutputPreference();
+  const preset = outputPreset();
+  setStatus(`OUTPUT / ${q.toUpperCase()} · PHOTO ${preset.photo} / VIDEO ${preset.video}`);
 }
 
 function resizePreview() {
@@ -1146,22 +1168,41 @@ async function saveStill() {
   if (!state.imageReady || state.isRecording || state.recordStarting) return;
   try {
     const originalSize=[canvas.width,canvas.height];
+    const originalPurpose = state.renderPurpose;
     const [exportW,exportH]=exportSize();
     try {
-      setRenderSize(exportW,exportH,false);
-      if (state.frameDirty && state.type==='photo') {
+      state.renderPurpose = 'export';
+      setRenderSize(exportW,exportH,true);
+      if (state.type==='photo') {
+        allocateSourceTexture(exportW, exportH);
+        sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
+        uploadSource();
+        state.frameDirty=false;
+      } else if (state.type === 'video') {
+        changeVideoSourceSize(exportW, exportH);
         sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
         uploadSource();
         state.frameDirty=false;
       }
       renderFrame(performance.now()*.001,false);
       const blob=await toBlobAsync(canvas,'image/png');
-      const name=`hidden_${safeBaseName(state.fileName)}_m${state.mode+1}.png`;
-      setRenderSize(...originalSize);
+      const name=`hidden_${safeBaseName(state.fileName)}_m${state.mode+1}_${state.outputQuality}.png`;
       await shareOrSave(blob,name,true);
-      setStatus(`IMAGE EXPORTED · ${exportW} × ${exportH}`);
+      setStatus(`IMAGE EXPORTED · ${exportW} × ${exportH} · ${state.outputQuality.toUpperCase()}`);
     } finally {
-      if(canvas.width!==originalSize[0] || canvas.height!==originalSize[1]) setRenderSize(...originalSize);
+      state.renderPurpose = originalPurpose;
+      if (state.imageReady) {
+        setSourceDimensions(state.originalW, state.originalH);
+        if (state.type === 'photo') {
+          sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
+          uploadSource();
+          state.frameDirty=false;
+        } else {
+          state.frameDirty=true;
+        }
+      } else if(canvas.width!==originalSize[0] || canvas.height!==originalSize[1]) {
+        setRenderSize(...originalSize, true);
+      }
     }
   } catch(error) {setStatus(`EXPORT FAILED: ${error.message}`,true);console.error(error);}
 }
@@ -1186,6 +1227,7 @@ function syncRecordControls(busy = false) {
   $('playButton').disabled = locked || state.type !== 'video' || !state.videoReady;
   $('saveButton').disabled = locked || !state.imageReady;
   $('renderQuality').disabled = locked;
+  $('outputQuality').disabled = locked;
 }
 async function startRecording() {
   if (!state.imageReady || state.isRecording || state.recordStarting) return;
@@ -1213,10 +1255,16 @@ async function startRecording() {
         });
       }
     }
+    const preset = outputPreset();
     const [recordW, recordH] = sizeForLimit(
-      state.originalW, state.originalH, PERFORMANCE[state.quality].video
+      state.originalW, state.originalH, preset.video
     );
-    if (videoInput) changeVideoSourceSize(recordW, recordH);
+    state.renderPurpose = 'record';
+    if (videoInput) {
+      changeVideoSourceSize(recordW, recordH);
+    } else {
+      allocateSourceTexture(recordW, recordH);
+    }
     setRenderSize(recordW, recordH, true);
     sourceCtx.drawImage(state.element, 0, 0, state.sourceW, state.sourceH);
     uploadSource();
@@ -1227,7 +1275,7 @@ async function startRecording() {
     stream = canvas.captureStream(PERFORMANCE[state.quality].fps);
     const mime = pickMimeType();
     const options = {
-      videoBitsPerSecond: Math.max(1800000, Math.min(6000000, recordW * recordH * 4.5))
+      videoBitsPerSecond: Math.max(3500000, Math.min(preset.bitrate, Math.round(recordW * recordH * 5.0)))
     };
     if (mime) options.mimeType = mime;
     let recorder;
@@ -1259,18 +1307,22 @@ async function startRecording() {
       document.body.classList.remove('is-recording');
       $('recordLabel').textContent = 'RECORD';
       $('recState').textContent = '';
+      state.renderPurpose = 'preview';
       if (videoInput && state.type === 'video') {
         video.loop = true;
         $('playLabel').textContent = 'PLAY';
         $('playIcon').textContent = '▶';
-        const [pw, ph] = previewSize();
-        changeVideoSourceSize(pw, ph);
       }
       if (state.imageReady) {
-        const [pw, ph] = previewSize();
-        setRenderSize(pw, ph, true);
-        state.frameDirty = true;
-        $('dimensionsTag').textContent = `${pw} × ${ph} · GPU`;
+        setSourceDimensions(state.originalW, state.originalH);
+        if (state.type === 'photo') {
+          sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
+          uploadSource();
+          state.frameDirty = false;
+        } else {
+          state.frameDirty = true;
+        }
+        $('dimensionsTag').textContent = `${canvas.width} × ${canvas.height} · GPU`;
       }
       syncRecordControls(false);
       if (!chunks.length) {
@@ -1288,7 +1340,7 @@ async function startRecording() {
         const file = new File([blob], state.recordedName, { type: blob.type });
         $('shareVideo').disabled = !(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
       } catch (_) { $('shareVideo').disabled = true; }
-      setStatus('VIDEO READY');
+      setStatus(`VIDEO READY · ${state.outputQuality.toUpperCase()}`);
     };
     recorder.start(300);
     state.recordStartedAt = performance.now();
@@ -1310,6 +1362,7 @@ async function startRecording() {
     }
     setStatus(videoInput ? 'RECORDING VIDEO · 45S MAX' : 'RECORDING STILL · 45S MAX');
   } catch (error) {
+    state.renderPurpose = 'preview';
     if (state.recorder && state.recorder.state !== 'inactive') {
       state.recorder.onstop = null;
       state.recorder.stop();
@@ -1327,12 +1380,15 @@ async function startRecording() {
         video.loop = true;
         $('playLabel').textContent = 'PLAY';
         $('playIcon').textContent = '▶';
-        const [pw, ph] = previewSize();
-        changeVideoSourceSize(pw, ph);
       }
-      const [pw, ph] = previewSize();
-      setRenderSize(pw, ph, true);
-      state.frameDirty = true;
+      setSourceDimensions(state.originalW, state.originalH);
+      if (state.type === 'photo') {
+        sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
+        uploadSource();
+        state.frameDirty = false;
+      } else {
+        state.frameDirty = true;
+      }
     }
     syncRecordControls(false);
     setStatus(`RECORD FAILED: ${error.message}`, true);
@@ -1453,6 +1509,18 @@ function saveAccidentPreferences() {
       levels: state.accidentLevels
     }));
   } catch (_) { /* A blocked storage API must not prevent image processing. */ }
+}
+
+const OUTPUT_STORAGE_KEY = 'hidden-side-v2-output-quality';
+function loadOutputPreference() {
+  try {
+    const saved = localStorage.getItem(OUTPUT_STORAGE_KEY);
+    if (saved && OUTPUT_PRESETS[saved]) state.outputQuality = saved;
+  } catch (_) { /* Storage may be blocked. */ }
+}
+function saveOutputPreference() {
+  try { localStorage.setItem(OUTPUT_STORAGE_KEY, state.outputQuality); }
+  catch (_) { /* Storage may be blocked. */ }
 }
 
 function updateAccidentLevelUI() {
@@ -1651,6 +1719,7 @@ function bindEvents() {
     button.addEventListener('click', () => previewAccident(Number(button.dataset.accidentTest)));
   });
   $('renderQuality').addEventListener('change',e=>changeQuality(e.target.value));
+  $('outputQuality').addEventListener('change',e=>changeOutputQuality(e.target.value));
   $('importButton').addEventListener('click',()=>{if(!state.isRecording && !state.recordStarting)$('fileInput').click();});
   $('emptyImport').addEventListener('click',()=>$('fileInput').click());
   $('fileInput').addEventListener('change',async event=>{
@@ -1698,6 +1767,7 @@ function bindEvents() {
   $('trail').value = Math.round(state.trail * 100);
   updateTrailUI();
   $('renderQuality').value=state.quality;
+  $('outputQuality').value=state.outputQuality;
   $('depthValue').textContent=String(Math.round(state.depth*100)).padStart(2,'0');
   $('erosionValue').textContent=String(Math.round(state.erosion*100)).padStart(2,'0');
   $('driftValue').textContent=String(Math.round(state.drift*100)).padStart(2,'0');

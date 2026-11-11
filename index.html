@@ -11,13 +11,13 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon-192.png" type="image/png">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
-  <link rel="stylesheet" href="./style.css?v=0411">
+  <link rel="stylesheet" href="./style.css?v=0412">
   <title>HIDDEN SIDE — image excavator</title>
 </head>
 <body>
   <main id="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / V2 · 0.4.11</small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / V2 · 0.4.12</small></div></div>
       <div class="top-meta"><span id="sourceTag">NO SIGNAL</span><span id="dimensionsTag">—</span></div>
     </header>
 
@@ -81,6 +81,14 @@
           <option value="fine">FINE / 960</option>
         </select>
       </div>
+      <div class="render-config">
+        <label for="outputQuality">OUTPUT</label>
+        <select id="outputQuality" aria-label="Export quality">
+          <option value="standard">STANDARD / 2048 / 720P</option>
+          <option value="high" selected>HIGH / 3072 / 1080P</option>
+          <option value="max">MAX / 4096 / 1440P</option>
+        </select>
+      </div>
     </section>
 
     <footer class="actionbar">
@@ -116,6 +124,6 @@
   </div>
   <video id="sourceVideo" muted playsinline webkit-playsinline preload="auto" style="display:none"></video>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./app.js?v=0411"></script>
+  <script src="./app.js?v=0412"></script>
 </body>
 </html>

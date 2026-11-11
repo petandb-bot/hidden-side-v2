@@ -1,13 +1,13 @@
-# HIDDEN SIDE V2 · 0.4.11
+# HIDDEN SIDE V2 · 0.4.12
 
 A local, GPU-processed image and video excavator built with p5.js 1.11.13 and WebGL1.
 
-## v0.4.11 — Import / shader startup repair
+## v0.4.12 — Import / shader startup repair
 
 - Fixed two premature references to `outline` in the UNDER and SEEP BREAK displacement paths. `outline` is only computed after source sampling, so v0.4.10 failed to compile its WebGL1 fragment shader at application startup; both photo and video import were consequently blocked.
 - Kept the intended soft-field slip and shadow-displacement effects independent of the downstream edge calculation. No new block/rectangle effects were introduced.
 - Preserved v0.4.9 GHOST smoothing, five modes, variants, CALM/BREAK, RESEED, ACCIDENT TUNE/TEST, import/export and recording.
-- Updated script/style query strings and the PWA service-worker cache key to 0411.
+- Updated script/style query strings and the PWA service-worker cache key to 0412.
 - Confirmed GLSL ES 1.00 compilation and program linking using Mesa's surfaceless OpenGL ES2 implementation.
 - Confirmed 120 software-GPU draw calls (5 modes × 2 variants × 2 range settings × 6 RESEED families) without OpenGL errors.
 - Checked browser-side image/video import logic with an isolated GPU stub: PNG/JPEG photos, valid WebM video, invalid video preserving both an existing photo and an existing video. Browser-native GPU initialization, full recording and iPhone Safari remain untested.
