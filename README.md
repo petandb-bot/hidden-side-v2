@@ -1,14 +1,14 @@
-# HIDDEN SIDE V2 · v0.4.13
+# HIDDEN SIDE V2 · v0.4.14
 
 A browser-based, local GPU image/video transformation tool using p5.js 1.11.13 and WebGL1 (GLSL ES 1.00).
 
-## Fixes in v0.4.13
+## Fixes in v0.4.14
 
 - **GHOST and SEEP PNG output:** the v0.4.12 still-image export cleared the feedback textures before rendering the high-resolution image, so previously accumulated temporal effects disappeared in the exported PNG. Export now uses the existing preview history without resetting or modifying it.
 - **History continuity:** returning from high-resolution PNG output no longer resets TRAIL or the feedback ring. The low-resolution preview resumes with its previous memory intact.
 - **Stable still capture:** the preview draw loop is suspended while the high-resolution PNG is rendered and encoded, preventing it from overwriting the export canvas. The regular preview is restored *before* opening the share sheet, even if encoding fails.
 - **No aesthetic changes:** GHOST's color/melt shader, other five modes, variants, CALM/BREAK, RESEED, ACCIDENT/TUNE/TEST and recording algorithms are unchanged.
-- Updated cache and asset versions to `0413`.
+- Updated cache and asset versions to `0414`.
 
 ## Preview and output
 
