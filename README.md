@@ -1,15 +1,16 @@
-# HIDDEN SIDE V2 · 0.4.10
+# HIDDEN SIDE V2 · 0.4.11
 
 A local, GPU-processed image and video excavator built with p5.js 1.11.13 and WebGL1.
 
-## v0.4.10 — Under/Seep break redesign
+## v0.4.11 — Import / shader startup repair
 
-- Fixed a fragment shader compilation failure in v0.4.4: `corridor` was referenced outside its declaration scope.
-- Corrected the vignette `smoothstep` argument order for defined GLSL behavior.
-- Updated the service worker cache ID and asset query versions to `046` to prevent old files from being reused.
-- Preserved all five processing modes, per-mode variants, CALM / BREAK, RESEED, TRAIL, import, and export controls.
-- Verified both shaders compile and link in a software OpenGL ES context.
-- Verified actual GPU rendering for all 20 combinations of five modes, two variants, and CALM / BREAK at test resolution without GL errors. These are software GPU tests, not an iPhone Safari hardware test.
+- Fixed two premature references to `outline` in the UNDER and SEEP BREAK displacement paths. `outline` is only computed after source sampling, so v0.4.10 failed to compile its WebGL1 fragment shader at application startup; both photo and video import were consequently blocked.
+- Kept the intended soft-field slip and shadow-displacement effects independent of the downstream edge calculation. No new block/rectangle effects were introduced.
+- Preserved v0.4.9 GHOST smoothing, five modes, variants, CALM/BREAK, RESEED, ACCIDENT TUNE/TEST, import/export and recording.
+- Updated script/style query strings and the PWA service-worker cache key to 0411.
+- Confirmed GLSL ES 1.00 compilation and program linking using Mesa's surfaceless OpenGL ES2 implementation.
+- Confirmed 120 software-GPU draw calls (5 modes × 2 variants × 2 range settings × 6 RESEED families) without OpenGL errors.
+- Checked browser-side image/video import logic with an isolated GPU stub: PNG/JPEG photos, valid WebM video, invalid video preserving both an existing photo and an existing video. Browser-native GPU initialization, full recording and iPhone Safari remain untested.
 
 ## Previous changes
 
@@ -18,7 +19,7 @@ A local, GPU-processed image and video excavator built with p5.js 1.11.13 and We
 - Added optional HEIC/HEIF conversion using `heic2any` loaded only when required. The decoder requires internet access on first use.
 - Failed image selections no longer clear the current image.
 - Import errors are shown in the status bar and browser console.
-- Updated the v2 icon, home-screen name, manifest ID, and service worker revision.
+- V2 uses its own icon, home-screen name, manifest ID, and service worker revision.
 
 ## Deploy
 

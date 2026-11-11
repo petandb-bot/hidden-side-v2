@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.10 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.11 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -281,14 +281,14 @@ const FRAGMENT_SHADER = `
     if(macro>0.5) {
       if(u_mode < 0.5) {
         float slipNoise = fbm(axis*vec2(1.4,4.8) + vec2(t*0.06, u_seed*0.10));
-        float slipMask = smoothstep(0.60,0.82, slipNoise + structureRidge*0.18 + outline*0.05);
+        float slipMask = smoothstep(0.60,0.82, slipNoise + structureRidge*0.18);
         vec2 slipVec = vec2(noise2(uv*vec2(3.0,8.0)+vec2(t*0.05,u_seed*0.12))-0.5,
                             noise2(uv*vec2(2.6,6.4)-vec2(t*0.04,u_seed*0.09))-0.5);
         displaced += slipVec*(0.004+0.012*e)*slipMask;
         displaced += vec2(flow.y,-flow.x)*(slipNoise-0.5)*(0.003+0.008*e)*slipMask;
       } else if(u_mode < 3.5 && u_mode >= 2.5) {
         float poolNoise = fbm(field*0.42 + vec2(t*0.04, -t*0.03) + vec2(u_seed*0.05, u_seed*0.08));
-        float poolMask = smoothstep(0.52,0.84, poolNoise + medium*0.12 - outline*0.06);
+        float poolMask = smoothstep(0.52,0.84, poolNoise + medium*0.12);
         vec2 eddy = vec2(noise2(field*0.36+vec2(t*0.03,u_seed*0.07))-0.5,
                          noise2(field*0.30-vec2(t*0.025,u_seed*0.06))-0.5);
         displaced += eddy*(0.002+0.006*e)*poolMask;
@@ -983,6 +983,7 @@ async function openFile(file) {
   const ticket = ++state.importGeneration;
   setStatus(isVideo ? 'LOADING VIDEO' : 'DECODING IMAGE');
   let prepared = null;
+  let videoCommitted = false;
   try {
     if (!isVideo) {
       prepared = await decodePhoto(file);
@@ -1036,6 +1037,7 @@ async function openFile(file) {
       }
       // Commit only after the incoming video has decoded successfully.
       clearPreviousSource();
+      videoCommitted = true;
       state.type = 'video';
       state.fileName = name;
       const video = $('sourceVideo');
@@ -1085,7 +1087,8 @@ async function openFile(file) {
   } catch (error) {
     if (ticket !== state.importGeneration) return;
     console.error('Import failed:', {name, type:file.type, bytes:file.size}, error);
-    if (isVideo) {
+    // A probe/decode failure must not clear the previously displayed image or video.
+    if (isVideo && videoCommitted) {
       clearPreviousSource();
       $('emptyState').hidden = false;
       $('emptyState').style.display = 'flex';
