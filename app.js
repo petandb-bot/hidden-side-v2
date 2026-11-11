@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.14 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.15 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -475,59 +475,65 @@ const FRAGMENT_SHADER = `
         color = mix(color,residue,pooling);
       }
     } else {
-      vec2 chromaShift = vec2(0.0012+0.0034*e+0.0013*variant,0.0010+0.0022*e+0.0011*variant);
-      chromaShift *= vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.18+0.82,cos(t*(0.17+0.03*variant)+u_seed)*0.17+0.83);
-      vec2 colorDrift = flow*(0.0024+0.0040*e+0.0020*variant) + vec2(-flow.y, flow.x)*(0.0010+0.0019*e);
-      vec2 meltShift = flow*(0.010+0.014*e+0.004*variant) + vec2(structureField,-structureField)*(0.0016+0.0026*e);
+      float ghostMotion = 0.45 + 1.55*u_drift;
+      float trailSense = smoothstep(0.58, 0.995, u_trailRetention);
+      vec2 chromaShift = vec2(0.0014+0.0036*e+0.0014*variant,0.0011+0.0024*e+0.0012*variant);
+      chromaShift *= (0.88 + 0.18*ghostMotion) * vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.18+0.82,cos(t*(0.17+0.03*variant)+u_seed)*0.17+0.83);
+      vec2 colorDrift = flow*(0.0028+0.0046*e+0.0022*variant)*(0.70 + 0.45*ghostMotion) + vec2(-flow.y, flow.x)*(0.0010+0.0022*e)*(0.75+0.35*ghostMotion);
+      vec2 meltShift = flow*(0.012+0.016*e+0.004*variant)*(0.84+0.28*ghostMotion) + vec2(structureField,-structureField)*(0.0018+0.0030*e);
       vec3 nearA = src(clamp(displaced + chromaShift + colorDrift, vec2(0.001), vec2(0.999)));
       vec3 nearB = src(clamp(displaced - chromaShift*0.66 - colorDrift*0.52, vec2(0.001), vec2(0.999)));
-      vec3 nearC = src(clamp(displaced + vec2(-chromaShift.y, chromaShift.x)*0.62 + flow*0.0024, vec2(0.001), vec2(0.999)));
+      vec3 nearC = src(clamp(displaced + vec2(-chromaShift.y, chromaShift.x)*0.62 + flow*0.0028, vec2(0.001), vec2(0.999)));
       vec3 meltA = src(clamp(displaced + meltShift, vec2(0.001), vec2(0.999)));
       vec3 meltB = src(clamp(displaced - meltShift*0.78, vec2(0.001), vec2(0.999)));
       vec3 meltC = src(clamp(displaced + vec2(meltShift.y, -meltShift.x)*0.64, vec2(0.001), vec2(0.999)));
-      vec3 melted = c*0.34 + meltA*0.24 + meltB*0.22 + meltC*0.20;
+      vec3 melted = c*0.30 + meltA*0.27 + meltB*0.23 + meltC*0.20;
       corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.10+0.03*variant),u_seed));
-      float spreadMix = 0.11 + 0.08*e + 0.05*variant;
-      float meltMix = 0.14 + 0.16*e + 0.06*variant;
+      float spreadMix = 0.12 + 0.08*e + 0.05*variant + 0.04*trailSense;
+      float meltMix = (variant>0.5 ? 0.12 : 0.18) + 0.16*e + 0.06*trailSense;
       vec3 chromaVeil = vec3(nearA.r*0.84 + melted.r*0.16,
-                             c.g*0.48 + nearB.g*0.26 + nearC.b*0.18 + melted.g*0.08,
-                             nearB.b*0.68 + melted.b*0.32);
-      vec3 paletteWarp = mix(vec3(0.10,0.16,0.28), vec3(0.42,0.18,0.40), 0.5 + 0.5*sin(t*0.07 + corridor*2.8 + u_seed*0.13));
+                             c.g*0.44 + nearB.g*0.28 + nearC.b*0.18 + melted.g*0.10,
+                             nearB.b*0.66 + melted.b*0.34);
+      vec3 paletteWarp = mix(vec3(0.08,0.16,0.28), vec3(0.44,0.18,0.36), 0.5 + 0.5*sin(t*0.08 + corridor*2.9 + u_seed*0.13 + ghostMotion*0.5));
       float lightBloom = smoothstep(0.40,0.90,l+outline*0.10);
       float edgeBloom = smoothstep(0.10,0.42,edge);
       float silhouetteHold = 1.0 - edgeBloom*0.30;
       color = mix(c, melted, meltMix);
       color = mix(color, chromaVeil, spreadMix);
-      color = mix(color, paletteWarp, (0.08 + 0.08*e + 0.04*variant) * (0.30 + 0.70*lightBloom));
-      color += vec3(0.12,0.04,0.15) * lightBloom * (0.030 + 0.060*e + 0.036*variant);
+      color = mix(color, paletteWarp, (0.10 + 0.08*e + 0.04*variant) * (0.30 + 0.70*lightBloom));
+      color += vec3(0.12,0.04,0.15) * lightBloom * (0.032 + 0.060*e + 0.038*variant);
       color += vec3(0.02,0.07,0.10) * (corridor-0.50) * e * (0.08+0.10*variant);
       color += vec3(0.01,0.05,0.10) * edgeBloom * (0.024+0.045*variant);
       color += (micro-0.5)*e*(0.008+0.012*variant);
       color += vec3(0.09,0.05,0.12)*gesture*(0.05+0.07*e+0.038*variant);
-      color = mix(color, vec3(0.050,0.054,0.074), 0.030+0.028*d+0.02*variant);
-      color = mix(color, c, (0.32-0.04*variant) * silhouetteHold + edgeBloom*0.08);
-      ghostPastUv = uv + colorDrift*(0.54+0.12*variant)
-                      + vec2(sin(t*(0.22+0.04*variant)),cos(t*(0.20+0.04*variant)))*(0.0007+0.0010*variant);
+      color = mix(color, vec3(0.050,0.054,0.074), 0.028+0.026*d+0.02*variant);
+      color = mix(color, c, ((variant>0.5 ? 0.24 : 0.34)-0.04*variant) * silhouetteHold + edgeBloom*0.08);
+      ghostPastUv = uv + colorDrift*(0.60+0.14*variant+0.08*trailSense)
+                      + vec2(sin(t*(0.22+0.04*variant)),cos(t*(0.20+0.04*variant)))*(0.0007+0.0010*variant+0.0006*trailSense);
       ghostPastUv += vec2(structureField,-structureField)*(0.0010+e*0.0022);
       color += vec3(0.10,0.05,0.16)*structureRidge*(0.020+0.032*e);
       if(u_historyMix>0.5) {
-        vec2 memoryShiftA = colorDrift*(0.72+0.14*variant) + vec2(chromaShift.x*0.80,-chromaShift.y*0.76);
-        vec2 memoryShiftB = vec2(-chromaShift.x*0.62, chromaShift.y*0.48) + flow*0.0021;
+        vec2 memoryShiftA = colorDrift*(0.78+0.18*variant+0.10*trailSense) + vec2(chromaShift.x*0.80,-chromaShift.y*0.76);
+        vec2 memoryShiftB = vec2(-chromaShift.x*0.62, chromaShift.y*0.48) + flow*0.0023;
         vec3 memoryA = past(uv + memoryShiftA);
         vec3 memoryB = past(uv - memoryShiftB);
-        vec3 memoryColor = vec3(memoryA.r*0.80 + color.r*0.20,
-                                color.g*0.72 + memoryB.g*0.28,
-                                memoryB.b*0.66 + memoryA.b*0.18 + color.b*0.16);
-        float memoryBlend = (0.04 + 0.07*e + 0.03*variant) * (0.24 + 0.54*lightBloom + 0.22*edgeBloom);
+        vec3 memoryColor = vec3(memoryA.r*0.78 + color.r*0.22,
+                                color.g*0.70 + memoryB.g*0.30,
+                                memoryB.b*0.64 + memoryA.b*0.18 + color.b*0.18);
+        float memoryBlend = (variant>0.5 ? 0.05 : 0.03) + (0.08+0.05*variant)*trailSense + 0.05*e;
+        memoryBlend *= (0.24 + 0.54*lightBloom + 0.22*edgeBloom);
         color = mix(color, memoryColor, memoryBlend);
       }
       if(variant>0.5) {
-        vec2 denseOffset = vec2(0.0042+0.0052*e,-0.0014-0.0032*e);
+        vec2 denseOffset = vec2(0.0046+0.0058*e,-0.0016-0.0034*e);
         vec3 secondImage = src(clamp(displaced+denseOffset, vec2(0.001), vec2(0.999)));
-        vec3 doubleExposure = vec3(color.r*0.82+secondImage.b*0.18,
-                                   color.g*0.72+secondImage.g*0.28,
-                                   secondImage.r*0.34+color.b*0.66);
-        color = mix(color,doubleExposure,0.04+0.05*e);
+        vec3 doubleExposure = vec3(color.r*0.80+secondImage.b*0.20,
+                                   color.g*0.68+secondImage.g*0.32,
+                                   secondImage.r*0.36+color.b*0.64);
+        color = mix(color,doubleExposure,0.07+0.06*e+0.04*trailSense);
+      } else {
+        vec3 smoothGhost = (meltA + meltB + nearA + nearB) * 0.25;
+        color = mix(color, smoothGhost, 0.05 + 0.05*e + 0.03*trailSense);
       }
       if(macro>0.5) {
         vec2 macroShift = vec2(0.004+0.006*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
@@ -622,7 +628,7 @@ const FRAGMENT_SHADER = `
     color = color * (0.955 + 0.02*variant) + vec3(0.018 - 0.004*variant);
     // Blend only after grading, so retained frames are not graded repeatedly.
     if (u_mode>3.5 && u_historyMix>0.5) {
-      color = mix(color,past(ghostPastUv),u_trailRetention * (0.40 + 0.06*variant));
+      color = mix(color,past(ghostPastUv),u_trailRetention * (0.28 + 0.08*variant + 0.14*smoothstep(0.58, 0.995, u_trailRetention)));
     }
     gl_FragColor = vec4(sat3(color),1.0);
   }
@@ -1429,8 +1435,9 @@ function stopRecording() {
 }
 function clearExport() {state.recordedBlob=null;state.recordedName='';$('exportPanel').hidden=true;}
 function setMode(mode) {
-  if (state.mode!==mode) resetFeedback();
+  if (state.mode!==mode) { resetFeedback(); state.lastRenderTime = 0; }
   state.mode=mode;
+  if (state.type==='photo') state.frameDirty = true;
   $('modeIndex').textContent=String(mode+1).padStart(2,'0')+' / 05';
   document.querySelectorAll('.mode-button').forEach(b=>{
     const active=Number(b.dataset.mode)===mode;
@@ -1464,7 +1471,10 @@ function updateVariantUI() {
 function setVariant(index) {
   state.modeVariants[state.mode] = index;
   resetFeedback();
+  state.lastRenderTime = 0;
+  if (state.type==='photo') state.frameDirty = true;
   updateVariantUI();
+  if (state.mode === 4) setStatus(index === 0 ? 'GHOST / SOFT' : 'GHOST / DENSE');
 }
 
 
@@ -1479,6 +1489,8 @@ function updateMacroUI() {
 function setMacro(index) {
   state.macro = index;
   resetFeedback();
+  state.lastRenderTime = 0;
+  if (state.type==='photo') state.frameDirty = true;
   updateMacroUI();
   setStatus(index === 0 ? 'CALM RANGE' : 'BREAK RANGE');
 }
@@ -1696,6 +1708,12 @@ function bindEvents() {
       const val=Number($(id).value);
       state[id]=val/100;
       $(id+'Value').textContent=String(val).padStart(2,'0');
+      if (state.type==='photo') state.frameDirty = true;
+      if (id === 'drift' && state.mode === 4) {
+        resetFeedback();
+        state.lastRenderTime = 0;
+        setStatus(`GHOST / DRIFT ${String(val).padStart(2,'0')}`);
+      }
     });
   });
   document.querySelectorAll('.mode-button').forEach(button=>{
@@ -1706,6 +1724,12 @@ function bindEvents() {
     const value=Number($('trail').value);
     state.trail=value/100;
     $('trailValue').textContent=String(value).padStart(2,'0');
+    if (state.mode === 4) {
+      resetFeedback();
+      state.lastRenderTime = 0;
+      if (state.type==='photo') state.frameDirty = true;
+      setStatus(`GHOST / TRAIL ${String(value).padStart(2,'0')}`);
+    }
   });
   document.querySelectorAll('.variant-button').forEach(button=>{
     button.addEventListener('click', ()=> setVariant(Number(button.dataset.variant)));
