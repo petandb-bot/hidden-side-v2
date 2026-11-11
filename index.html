@@ -11,18 +11,19 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon-192.png" type="image/png">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
-  <link rel="stylesheet" href="./style.css?v=0415">
+  <link rel="stylesheet" href="./style.css?v=0417">
   <title>HIDDEN SIDE — image excavator</title>
 </head>
 <body>
   <main id="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>IMAGE EXCAVATOR / V2 · 0.4.15</small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>V2 / 0.4.17</small></div></div>
       <div class="top-meta"><span id="sourceTag">NO SIGNAL</span><span id="dimensionsTag">—</span></div>
     </header>
 
     <section id="stage" aria-label="Processed image preview">
       <div id="canvas-host"></div>
+      <button id="previewExpand" class="preview-expand" type="button" aria-pressed="false" aria-label="Focus preview">FOCUS <span aria-hidden="true">↗</span></button>
       <div class="stage-crosshair stage-crosshair-tl" aria-hidden="true"></div>
       <div class="stage-crosshair stage-crosshair-br" aria-hidden="true"></div>
       <div class="stage-topline"><span id="modeIndex">01 / 05</span><span id="recState"></span></div>
@@ -35,7 +36,7 @@
     </section>
 
     <section class="control-area" aria-label="Processing controls">
-      <div class="section-heading"><span>MODES <span class="muted">/ 05</span></span><button id="reroll" class="plain-button" type="button" aria-label="Reseed image transformations">RESEED</button></div>
+      <div class="section-heading"><span>PROCESS / 05</span><button id="reroll" class="plain-button" type="button" aria-label="Reseed image transformations">RESEED</button></div>
       <div class="mode-strip" id="modes" role="group" aria-label="Processing modes">
         <button type="button" class="mode-button active" data-mode="0"><span class="mode-num">01</span><span class="mode-name">UNDER</span></button>
         <button type="button" class="mode-button" data-mode="1"><span class="mode-num">02</span><span class="mode-name">NEGATIVE</span></button>
@@ -53,45 +54,49 @@
           <input id="trail" type="range" min="0" max="100" value="55" aria-label="Ghost trail length">
         </label>
       </div>
-      <div class="macro-row" id="macroRow" role="group" aria-label="Processing range">
-        <span class="macro-label">RANGE</span>
-        <div class="macro-strip">
-          <button type="button" class="macro-button active" data-macro="0" aria-pressed="true">CALM</button>
-          <button type="button" class="macro-button" data-macro="1" aria-pressed="false">BREAK</button>
+      <div class="behavior-row">
+        <div class="macro-row" id="macroRow" role="group" aria-label="Processing range">
+          <span class="macro-label">RANGE</span>
+          <div class="macro-strip">
+            <button type="button" class="macro-button active" data-macro="0" aria-pressed="true">CALM</button>
+            <button type="button" class="macro-button" data-macro="1" aria-pressed="false">BREAK</button>
+          </div>
         </div>
-      </div>
-      <div class="accident-row" id="accidentRow" role="group" aria-label="Accident events">
-        <span class="accident-label">ACCIDENT</span>
-        <div class="accident-strip">
-          <button type="button" class="accident-button" data-accident="off" aria-pressed="false">OFF</button>
-          <button type="button" class="accident-button active" data-accident="on" aria-pressed="true">ON</button>
+        <div class="accident-row" id="accidentRow" role="group" aria-label="Accident events">
+          <span class="accident-label">ACCIDENT</span>
+          <div class="accident-strip">
+            <button type="button" class="accident-button" data-accident="off" aria-pressed="false">OFF</button>
+            <button type="button" class="accident-button active" data-accident="on" aria-pressed="true">ON</button>
+          </div>
+          <button id="accidentTuneButton" class="accident-tune-trigger" type="button" aria-haspopup="dialog" aria-controls="accidentPanel">TUNE</button>
         </div>
-        <button id="accidentTuneButton" class="accident-tune-trigger" type="button" aria-haspopup="dialog" aria-controls="accidentPanel">TUNE</button>
       </div>
       <div class="sliders">
         <label class="parameter"><div class="parameter-info"><span>DEPTH</span><output id="depthValue">50</output></div><input id="depth" type="range" min="0" max="100" value="50"></label>
         <label class="parameter"><div class="parameter-info"><span>EROSION</span><output id="erosionValue">36</output></div><input id="erosion" type="range" min="0" max="100" value="36"></label>
         <label class="parameter"><div class="parameter-info"><span>DRIFT</span><output id="driftValue">22</output></div><input id="drift" type="range" min="0" max="100" value="22"></label>
       </div>
-      <div class="render-config">
-        <label for="renderQuality">QUALITY</label>
-        <select id="renderQuality" aria-label="Preview quality">
-          <option value="eco">ECO / 520</option>
-          <option value="balanced" selected>BALANCED / 720</option>
-          <option value="fine">FINE / 960</option>
-        </select>
-      </div>
-      <div class="render-config">
-        <label for="outputQuality">OUTPUT</label>
-        <select id="outputQuality" aria-label="Export quality">
-          <option value="standard">STANDARD / 2048 / 720P</option>
-          <option value="high" selected>HIGH / 3072 / 1080P</option>
-          <option value="max">MAX / 4096 / 1440P</option>
-        </select>
+      <div class="quality-row">
+        <div class="render-config">
+          <label for="renderQuality">PREVIEW</label>
+          <select id="renderQuality" aria-label="Preview quality">
+            <option value="eco">ECO / 520</option>
+            <option value="balanced" selected>BALANCED / 720</option>
+            <option value="fine">FINE / 960</option>
+          </select>
+        </div>
+        <div class="render-config">
+          <label for="outputQuality">OUTPUT</label>
+          <select id="outputQuality" aria-label="Export quality">
+            <option value="standard">STANDARD / 2048 / 720P</option>
+            <option value="high" selected>HIGH / 3072 / 1080P</option>
+            <option value="max">MAX / 4096 / 1440P</option>
+          </select>
+        </div>
       </div>
     </section>
 
-    <footer class="actionbar">
+    <footer class="actionbar" id="actionbar">
       <button type="button" id="importButton" class="action"><span class="action-icon">+</span><span>IMPORT</span></button>
       <button type="button" id="playButton" class="action" disabled><span class="action-icon" id="playIcon">▶</span><span id="playLabel">PLAY</span></button>
       <button type="button" id="saveButton" class="action action-primary" disabled><span class="action-icon">↓</span><span>SAVE IMAGE</span></button>
@@ -124,6 +129,6 @@
   </div>
   <video id="sourceVideo" muted playsinline webkit-playsinline preload="auto" style="display:none"></video>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./app.js?v=0415"></script>
+  <script src="./app.js?v=0417"></script>
 </body>
 </html>

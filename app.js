@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.15 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.17 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -32,7 +32,7 @@ const state = {
   renderW: 4, renderH: 4, sourceW: 0, sourceH: 0,
   quality: 'balanced', outputQuality: 'high', renderPurpose: 'preview', isExporting: false,
   frameDirty: false, frameTime: -1, imageReady: false,
-  videoReady: false, isRecording: false, recordStarting: false, recorder: null, stream: null,
+  videoReady: false, isRecording: false, recordStarting: false, recordStopping: false, recorder: null, stream: null,
   recordStartedAt: 0, recordDuration: 0, recordedBlob: null, recordedName: '',
   pointer: [0.5, 0.5], touchForce: 0, touchTarget: 0,
   kinetic: 0, kineticTarget: 0, pointerTime: 0, pointerIsDown: false,
@@ -119,6 +119,14 @@ function draw() {
     }
     updateAccident(now);
     renderFrame(now * 0.001);
+    if (state.isRecording && state.type === 'photo' && state.stream) {
+      // A still photo has no media playback clock: explicitly submit the
+      // newly rendered canvas frame on browsers that support requestFrame.
+      const videoTrack = state.stream.getVideoTracks()[0];
+      if (videoTrack && typeof videoTrack.requestFrame === 'function') {
+        try { videoTrack.requestFrame(); } catch (_) { /* captureStream(fps) remains active. */ }
+      }
+    }
     if (state.isRecording && (now - state.recordStartedAt) >= MAX_RECORD_SECONDS * 1000) {
       stopRecording();
     }
@@ -475,70 +483,79 @@ const FRAGMENT_SHADER = `
         color = mix(color,residue,pooling);
       }
     } else {
-      float ghostMotion = 0.45 + 1.55*u_drift;
-      float trailSense = smoothstep(0.58, 0.995, u_trailRetention);
-      vec2 chromaShift = vec2(0.0014+0.0036*e+0.0014*variant,0.0011+0.0024*e+0.0012*variant);
-      chromaShift *= (0.88 + 0.18*ghostMotion) * vec2(sin(t*(0.18+0.03*variant)+u_seed)*0.18+0.82,cos(t*(0.17+0.03*variant)+u_seed)*0.17+0.83);
-      vec2 colorDrift = flow*(0.0028+0.0046*e+0.0022*variant)*(0.70 + 0.45*ghostMotion) + vec2(-flow.y, flow.x)*(0.0010+0.0022*e)*(0.75+0.35*ghostMotion);
-      vec2 meltShift = flow*(0.012+0.016*e+0.004*variant)*(0.84+0.28*ghostMotion) + vec2(structureField,-structureField)*(0.0018+0.0030*e);
+      float ghostMotion = 0.62 + 1.85*u_drift;
+      float trailSense = smoothstep(0.52, 0.996, u_trailRetention);
+      float softMode = 1.0 - variant;
+      float denseMode = variant;
+      vec2 chromaShift = vec2(0.0018+0.0040*e+0.0018*denseMode,0.0014+0.0030*e+0.0012*denseMode);
+      chromaShift *= (0.90 + 0.28*ghostMotion) * vec2(sin(t*(0.18+0.04*denseMode)+u_seed)*0.20+0.80,cos(t*(0.16+0.03*denseMode)+u_seed)*0.18+0.82);
+      vec2 colorDrift = flow*(0.0034+0.0050*e+0.0022*denseMode)*(0.76 + 0.60*ghostMotion) + vec2(-flow.y, flow.x)*(0.0014+0.0024*e)*(0.82+0.40*ghostMotion);
+      vec2 meltShift = flow*(0.014+0.020*e+0.004*denseMode)*(0.88+0.34*ghostMotion) + vec2(structureField,-structureField)*(0.0022+0.0034*e+0.0016*denseMode);
       vec3 nearA = src(clamp(displaced + chromaShift + colorDrift, vec2(0.001), vec2(0.999)));
-      vec3 nearB = src(clamp(displaced - chromaShift*0.66 - colorDrift*0.52, vec2(0.001), vec2(0.999)));
-      vec3 nearC = src(clamp(displaced + vec2(-chromaShift.y, chromaShift.x)*0.62 + flow*0.0028, vec2(0.001), vec2(0.999)));
+      vec3 nearB = src(clamp(displaced - chromaShift*0.72 - colorDrift*0.56, vec2(0.001), vec2(0.999)));
+      vec3 nearC = src(clamp(displaced + vec2(-chromaShift.y, chromaShift.x)*0.72 + flow*0.0032, vec2(0.001), vec2(0.999)));
       vec3 meltA = src(clamp(displaced + meltShift, vec2(0.001), vec2(0.999)));
-      vec3 meltB = src(clamp(displaced - meltShift*0.78, vec2(0.001), vec2(0.999)));
-      vec3 meltC = src(clamp(displaced + vec2(meltShift.y, -meltShift.x)*0.64, vec2(0.001), vec2(0.999)));
-      vec3 melted = c*0.30 + meltA*0.27 + meltB*0.23 + meltC*0.20;
-      corridor = fbm(uv*vec2(10.0,4.0)+vec2(-t*(0.10+0.03*variant),u_seed));
-      float spreadMix = 0.12 + 0.08*e + 0.05*variant + 0.04*trailSense;
-      float meltMix = (variant>0.5 ? 0.12 : 0.18) + 0.16*e + 0.06*trailSense;
-      vec3 chromaVeil = vec3(nearA.r*0.84 + melted.r*0.16,
-                             c.g*0.44 + nearB.g*0.28 + nearC.b*0.18 + melted.g*0.10,
-                             nearB.b*0.66 + melted.b*0.34);
-      vec3 paletteWarp = mix(vec3(0.08,0.16,0.28), vec3(0.44,0.18,0.36), 0.5 + 0.5*sin(t*0.08 + corridor*2.9 + u_seed*0.13 + ghostMotion*0.5));
-      float lightBloom = smoothstep(0.40,0.90,l+outline*0.10);
-      float edgeBloom = smoothstep(0.10,0.42,edge);
-      float silhouetteHold = 1.0 - edgeBloom*0.30;
+      vec3 meltB = src(clamp(displaced - meltShift*0.82, vec2(0.001), vec2(0.999)));
+      vec3 meltC = src(clamp(displaced + vec2(meltShift.y, -meltShift.x)*0.70, vec2(0.001), vec2(0.999)));
+      vec3 melted = c*0.24 + meltA*0.28 + meltB*0.26 + meltC*0.22;
+      corridor = fbm(uv*vec2(8.6,3.8)+vec2(-t*(0.11+0.03*denseMode),u_seed*1.2));
+      float lightBloom = smoothstep(0.38,0.92,l+outline*0.10);
+      float edgeBloom = smoothstep(0.08,0.44,edge);
+      float cavity = smoothstep(0.28,0.70,abs(structureField)+organ*0.14);
+      float silhouetteHold = 1.0 - edgeBloom*0.26;
+      float meltMix = 0.16 + 0.18*e + 0.09*trailSense + 0.03*softMode;
+      float spreadMix = 0.12 + 0.10*e + 0.05*trailSense + 0.06*denseMode;
+      vec3 chromaVeil = vec3(nearA.r*0.80 + meltB.r*0.20,
+                             c.g*0.38 + nearB.g*0.26 + nearC.b*0.18 + melted.g*0.18,
+                             nearB.b*0.58 + nearA.g*0.10 + melted.b*0.32);
+      vec3 moodA = vec3(0.06,0.12,0.24);
+      vec3 moodB = vec3(0.42,0.16,0.38);
+      vec3 moodC = vec3(0.90,0.44,0.16);
+      vec3 paletteWarp = mix(moodA, moodB, 0.5 + 0.5*sin(t*0.08 + corridor*3.0 + u_seed*0.12 + ghostMotion*0.55));
+      paletteWarp = mix(paletteWarp, moodC, smoothstep(0.48,0.92,lightBloom)*(0.18+0.14*denseMode));
       color = mix(c, melted, meltMix);
       color = mix(color, chromaVeil, spreadMix);
-      color = mix(color, paletteWarp, (0.10 + 0.08*e + 0.04*variant) * (0.30 + 0.70*lightBloom));
-      color += vec3(0.12,0.04,0.15) * lightBloom * (0.032 + 0.060*e + 0.038*variant);
-      color += vec3(0.02,0.07,0.10) * (corridor-0.50) * e * (0.08+0.10*variant);
-      color += vec3(0.01,0.05,0.10) * edgeBloom * (0.024+0.045*variant);
-      color += (micro-0.5)*e*(0.008+0.012*variant);
-      color += vec3(0.09,0.05,0.12)*gesture*(0.05+0.07*e+0.038*variant);
-      color = mix(color, vec3(0.050,0.054,0.074), 0.028+0.026*d+0.02*variant);
-      color = mix(color, c, ((variant>0.5 ? 0.24 : 0.34)-0.04*variant) * silhouetteHold + edgeBloom*0.08);
-      ghostPastUv = uv + colorDrift*(0.60+0.14*variant+0.08*trailSense)
-                      + vec2(sin(t*(0.22+0.04*variant)),cos(t*(0.20+0.04*variant)))*(0.0007+0.0010*variant+0.0006*trailSense);
-      ghostPastUv += vec2(structureField,-structureField)*(0.0010+e*0.0022);
-      color += vec3(0.10,0.05,0.16)*structureRidge*(0.020+0.032*e);
+      color = mix(color, paletteWarp, (0.12 + 0.10*e + 0.05*denseMode) * (0.32 + 0.68*lightBloom));
+      color += vec3(0.10,0.04,0.14) * lightBloom * (0.05 + 0.07*e + 0.03*denseMode);
+      color += vec3(0.02,0.08,0.12) * (corridor-0.48) * (0.10 + 0.10*e + 0.05*denseMode);
+      color += vec3(0.00,0.05,0.10) * cavity * (0.06 + 0.10*e + 0.05*softMode);
+      color += (micro-0.5)*(0.010+0.014*denseMode)*(0.6+0.8*e);
+      color += vec3(0.09,0.05,0.12)*gesture*(0.06+0.08*e+0.04*denseMode);
+      color = mix(color, vec3(0.044,0.048,0.068), 0.030+0.030*d+0.02*denseMode);
+      color = mix(color, c, (denseMode>0.5 ? 0.18 : 0.28) * silhouetteHold + edgeBloom*0.06);
+      ghostPastUv = uv + colorDrift*(0.74+0.16*denseMode+0.14*trailSense)
+                      + vec2(sin(t*(0.22+0.05*denseMode)),cos(t*(0.20+0.04*denseMode)))*(0.0008+0.0013*denseMode+0.0007*trailSense);
+      ghostPastUv += vec2(structureField,-structureField)*(0.0014+e*0.0028+0.0008*denseMode);
+      color += vec3(0.10,0.05,0.16)*structureRidge*(0.026+0.040*e+0.02*denseMode);
       if(u_historyMix>0.5) {
-        vec2 memoryShiftA = colorDrift*(0.78+0.18*variant+0.10*trailSense) + vec2(chromaShift.x*0.80,-chromaShift.y*0.76);
-        vec2 memoryShiftB = vec2(-chromaShift.x*0.62, chromaShift.y*0.48) + flow*0.0023;
+        vec2 memoryShiftA = colorDrift*(0.88+0.20*denseMode+0.18*trailSense) + vec2(chromaShift.x*0.92,-chromaShift.y*0.84);
+        vec2 memoryShiftB = vec2(-chromaShift.x*0.70, chromaShift.y*0.54) + flow*0.0028;
         vec3 memoryA = past(uv + memoryShiftA);
         vec3 memoryB = past(uv - memoryShiftB);
-        vec3 memoryColor = vec3(memoryA.r*0.78 + color.r*0.22,
-                                color.g*0.70 + memoryB.g*0.30,
-                                memoryB.b*0.64 + memoryA.b*0.18 + color.b*0.18);
-        float memoryBlend = (variant>0.5 ? 0.05 : 0.03) + (0.08+0.05*variant)*trailSense + 0.05*e;
-        memoryBlend *= (0.24 + 0.54*lightBloom + 0.22*edgeBloom);
+        vec3 memoryColor = vec3(memoryA.r*0.76 + color.r*0.24,
+                                color.g*0.64 + memoryB.g*0.36,
+                                memoryB.b*0.58 + memoryA.b*0.20 + color.b*0.22);
+        float memoryBlend = (softMode>0.5 ? 0.05 : 0.08) + 0.08*e + 0.10*trailSense + 0.04*denseMode;
+        memoryBlend *= (0.26 + 0.56*lightBloom + 0.18*edgeBloom);
         color = mix(color, memoryColor, memoryBlend);
       }
-      if(variant>0.5) {
-        vec2 denseOffset = vec2(0.0046+0.0058*e,-0.0016-0.0034*e);
+      if(denseMode>0.5) {
+        vec2 denseOffset = vec2(0.0056+0.0068*e,-0.0020-0.0040*e);
         vec3 secondImage = src(clamp(displaced+denseOffset, vec2(0.001), vec2(0.999)));
-        vec3 doubleExposure = vec3(color.r*0.80+secondImage.b*0.20,
-                                   color.g*0.68+secondImage.g*0.32,
-                                   secondImage.r*0.36+color.b*0.64);
-        color = mix(color,doubleExposure,0.07+0.06*e+0.04*trailSense);
+        vec3 fracture = src(clamp(displaced-denseOffset*0.62, vec2(0.001), vec2(0.999)));
+        vec3 doubleExposure = vec3(color.r*0.72 + secondImage.b*0.18 + fracture.r*0.10,
+                                   color.g*0.58 + secondImage.g*0.26 + fracture.b*0.16,
+                                   secondImage.r*0.34 + fracture.g*0.12 + color.b*0.54);
+        color = mix(color,doubleExposure,0.12+0.08*e+0.06*trailSense);
       } else {
-        vec3 smoothGhost = (meltA + meltB + nearA + nearB) * 0.25;
-        color = mix(color, smoothGhost, 0.05 + 0.05*e + 0.03*trailSense);
+        vec3 smoothGhost = (meltA + meltB + nearA + nearB + nearC) * 0.20;
+        color = mix(color, smoothGhost, 0.08 + 0.08*e + 0.06*trailSense);
+        color = mix(color, vec3(0.72,0.76,0.84), smoothstep(0.42,0.84,lightBloom)*(0.03+0.05*e));
       }
       if(macro>0.5) {
         vec2 macroShift = vec2(0.004+0.006*e, 0.0) * (0.5 + 0.5*sin(t*0.16+u_seed));
         vec3 macroGhost = src(clamp(displaced+macroShift, vec2(0.001), vec2(0.999)));
-        color = mix(color, vec3(macroGhost.r, color.g*0.84+macroGhost.g*0.16, macroGhost.b), 0.03+0.05*e);
+        color = mix(color, vec3(macroGhost.r, color.g*0.82+macroGhost.g*0.18, macroGhost.b), 0.04+0.06*e);
       }
     }
 
@@ -628,7 +645,7 @@ const FRAGMENT_SHADER = `
     color = color * (0.955 + 0.02*variant) + vec3(0.018 - 0.004*variant);
     // Blend only after grading, so retained frames are not graded repeatedly.
     if (u_mode>3.5 && u_historyMix>0.5) {
-      color = mix(color,past(ghostPastUv),u_trailRetention * (0.28 + 0.08*variant + 0.14*smoothstep(0.58, 0.995, u_trailRetention)));
+      color = mix(color,past(ghostPastUv),u_trailRetention * (0.22 + 0.10*variant + 0.18*smoothstep(0.52, 0.996, u_trailRetention)));
     }
     gl_FragColor = vec4(sat3(color),1.0);
   }
@@ -802,10 +819,10 @@ function renderFrame(now, updateHistory=true) {
   const elapsed = state.lastRenderTime > 0 ? Math.max(1/60, Math.min(0.15, now-state.lastRenderTime)) : 1/24;
   state.lastRenderTime = now;
   state.memoryFactor = Math.pow(0.98, elapsed*24);
-  // Ghost decay follows elapsed time directly; tuned for visible color memory without hard afterimages.
+  // Ghost decay follows elapsed time directly; tuned for eerie persistence and soft dissolution.
   const dense = state.modeVariants[4] === 1;
-  const duration = (0.18 + 3.55 * Math.pow(state.trail, 1.82)) * (dense ? 1.12 : 0.98);
-  state.trailRetention = Math.min(0.993, Math.exp(-elapsed / duration));
+  const duration = (0.22 + 4.30 * Math.pow(state.trail, 1.86)) * (dense ? 1.18 : 1.00);
+  state.trailRetention = Math.min(0.994, Math.exp(-elapsed / duration));
   drawPass(null, canvas.width, canvas.height, now);
   if ((state.mode===0 || state.mode===3 || state.mode===4) && updateHistory) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, feedbackFramebuffer);
@@ -862,6 +879,17 @@ function changeOutputQuality(q) {
   setStatus(`OUTPUT / ${q.toUpperCase()} · PHOTO ${preset.photo} / VIDEO ${preset.video}`);
 }
 
+function togglePreviewFocus(force) {
+  if (!state.imageReady) return;
+  const stage = $('stage');
+  const focus = typeof force === 'boolean' ? force : !stage.classList.contains('is-focus');
+  stage.classList.toggle('is-focus', focus);
+  $('previewExpand').setAttribute('aria-pressed', String(focus));
+  $('previewExpand').innerHTML = focus ? 'CLOSE <span aria-hidden="true">×</span>' : 'FOCUS <span aria-hidden="true">↗</span>';
+  $('previewExpand').setAttribute('aria-label', focus ? 'Exit focus preview' : 'Focus preview');
+  resizePreview();
+}
+
 function resizePreview() {
   if (!canvas) return;
   const box = $('stage').getBoundingClientRect();
@@ -876,6 +904,7 @@ function clearPreviousSource() {
   if (state.objectUrl) {URL.revokeObjectURL(state.objectUrl); state.objectUrl=null;}
   if (typeof ImageBitmap !== 'undefined' && state.element instanceof ImageBitmap) state.element.close();
   state.sourceGeneration++;
+  if ($('stage').classList.contains('is-focus')) togglePreviewFocus(false);
   state.type='none'; state.element=null; state.frameDirty=false; state.imageReady=false;
   $('timecode').textContent='';
   resetFeedback();
@@ -1041,6 +1070,7 @@ async function openFile(file) {
       $('playButton').disabled = true;
       $('saveButton').disabled = false;
       $('recordButton').disabled = !canRecord();
+      syncRecordControls(false);
       setStatus(canRecord() ? 'IMAGE READY' : 'IMAGE READY / RECORD UNSUPPORTED');
     } else {
       const probeUrl = URL.createObjectURL(file);
@@ -1114,6 +1144,7 @@ async function openFile(file) {
         $('playLabel').textContent = 'PLAY';
         $('playIcon').textContent = '▶';
       }
+      syncRecordControls(false);
       setStatus(started ? 'VIDEO READY' : 'VIDEO READY / PRESS PLAY');
     }
   } catch (error) {
@@ -1249,13 +1280,18 @@ function pickMimeType() {
   return ordered.find(mime => MediaRecorder.isTypeSupported(mime)) || '';
 }
 function syncRecordControls(busy = false) {
-  const locked = busy || state.isRecording || state.recordStarting || state.isExporting;
-  $('recordButton').disabled = locked || !state.imageReady || !canRecord();
+  const locked = busy || state.isRecording || state.recordStarting || state.recordStopping || state.isExporting;
+  // REC remains clickable during capture: the same button becomes STOP.
+  // Only disable it during start/finish transitions, not while isRecording=true.
+  $('recordButton').disabled = busy || state.recordStarting || state.recordStopping || state.isExporting ||
+    (!state.isRecording && (!state.imageReady || !canRecord()));
   $('importButton').disabled = locked;
   $('playButton').disabled = locked || state.type !== 'video' || !state.videoReady;
   $('saveButton').disabled = locked || !state.imageReady;
   $('renderQuality').disabled = locked;
   $('outputQuality').disabled = locked;
+  $('recordButton').setAttribute('aria-label', state.isRecording ? 'Stop recording' : 'Start recording');
+  $('actionbar').classList.toggle('has-video', state.type === 'video' && state.imageReady);
 }
 async function startRecording() {
   if (!state.imageReady || state.isRecording || state.recordStarting || state.isExporting) return;
@@ -1264,6 +1300,7 @@ async function startRecording() {
     return;
   }
   state.recordStarting = true;
+  state.recordStopping = false;
   syncRecordControls(true);
   clearExport();
   let stream = null;
@@ -1316,62 +1353,90 @@ async function startRecording() {
     const chunks = [];
     state.stream = stream;
     state.recorder = recorder;
+    let stopHandled = false;
+    let stopWatchdog = null;
+    let recordError = null;
     recorder.ondataavailable = event => {
       if (event.data && event.data.size > 0) chunks.push(event.data);
     };
-    recorder.onerror = event => {
-      setStatus(`RECORD FAILED: ${event.error?.message || 'UNKNOWN'}`, true);
-      stopRecording();
-    };
-    recorder.onstop = () => {
+    const finishRecording = () => {
+      if (stopHandled) return;
+      stopHandled = true;
+      if (stopWatchdog !== null) clearTimeout(stopWatchdog);
       stream.getTracks().forEach(track => track.stop());
       const elapsed = Math.min(MAX_RECORD_SECONDS,
         Math.max(0, (performance.now() - state.recordStartedAt) / 1000));
       state.recordDuration = elapsed;
+      // Assemble data before restoring any GPU resources. Even if preview
+      // restoration fails, the captured file remains accessible to the user.
+      const mimeActual = recorder.mimeType || mime || 'video/webm';
+      const extension = /mp4/i.test(mimeActual) ? 'mp4' : 'webm';
+      const blob = chunks.length ? new Blob(chunks, { type: mimeActual }) : null;
+      if (blob && blob.size > 0) {
+        state.recordedBlob = blob;
+        state.recordedName = `hidden_${safeBaseName(state.fileName)}_${Date.now()}.${extension}`;
+      }
       state.isRecording = false;
       state.recordStarting = false;
+      state.recordStopping = false;
       state.recorder = null;
       state.stream = null;
+      state.finishRecording = null;
+      state.armStopWatchdog = null;
+      state.renderPurpose = 'preview';
       document.body.classList.remove('is-recording');
       $('recordLabel').textContent = 'RECORD';
       $('recState').textContent = '';
-      state.renderPurpose = 'preview';
-      if (videoInput && state.type === 'video') {
-        video.loop = true;
-        $('playLabel').textContent = 'PLAY';
-        $('playIcon').textContent = '▶';
-      }
-      if (state.imageReady) {
-        setSourceDimensions(state.originalW, state.originalH);
-        if (state.type === 'photo') {
-          sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
-          uploadSource();
-          state.frameDirty = false;
-        } else {
-          state.frameDirty = true;
+      try {
+        if (videoInput && state.type === 'video') {
+          video.loop = true;
+          $('playLabel').textContent = 'PLAY';
+          $('playIcon').textContent = '▶';
         }
-        $('dimensionsTag').textContent = `${canvas.width} × ${canvas.height} · GPU`;
+        if (state.imageReady) {
+          setSourceDimensions(state.originalW, state.originalH);
+          if (state.type === 'photo') {
+            sourceCtx.drawImage(state.element, 0, 0, state.sourceW, state.sourceH);
+            uploadSource();
+            state.frameDirty = false;
+          } else {
+            state.frameDirty = true;
+          }
+          $('dimensionsTag').textContent = `${canvas.width} × ${canvas.height} · GPU`;
+        }
+      } catch (restoreError) {
+        console.error('Preview restoration failed after recording:', restoreError);
+        // The recording is still saved in memory and can be downloaded.
+      } finally {
+        syncRecordControls(false);
       }
-      syncRecordControls(false);
-      if (!chunks.length) {
-        setStatus('NO VIDEO DATA', true);
+      if (!state.recordedBlob) {
+        setStatus(recordError ? `RECORD FAILED: ${recordError}` : 'NO VIDEO DATA / TRY STANDARD OUTPUT', true);
         return;
       }
-      const actualMime = recorder.mimeType || mime || 'video/webm';
-      const extension = /mp4/i.test(actualMime) ? 'mp4' : 'webm';
-      const blob = new Blob(chunks, { type: actualMime });
-      state.recordedBlob = blob;
-      state.recordedName = `hidden_${safeBaseName(state.fileName)}_${Date.now()}.${extension}`;
-      $('exportDetails').textContent = `${secondsToClock(elapsed)} / ${recordW} × ${recordH} / ${extension.toUpperCase()} / SILENT / ${(blob.size / 1048576).toFixed(1)} MB`;
+      $('exportDetails').textContent = `${secondsToClock(elapsed)} / ${recordW} × ${recordH} / ${extension.toUpperCase()} / SILENT / ${(state.recordedBlob.size / 1048576).toFixed(1)} MB`;
       $('exportPanel').hidden = false;
       try {
-        const file = new File([blob], state.recordedName, { type: blob.type });
+        const file = new File([state.recordedBlob], state.recordedName, { type: state.recordedBlob.type });
         $('shareVideo').disabled = !(navigator.share && navigator.canShare && navigator.canShare({ files: [file] }));
       } catch (_) { $('shareVideo').disabled = true; }
-      setStatus(`VIDEO READY · ${state.outputQuality.toUpperCase()}`);
+      setStatus('VIDEO READY / SAVE FILE');
+    };
+    recorder.onerror = event => {
+      recordError = event.error?.message || 'ENCODER ERROR';
+      setStatus(`RECORD ERROR: ${recordError}`, true);
+      stopRecording();
+    };
+    recorder.onstop = finishRecording;
+    // Browser encoders occasionally fail to dispatch the final stop event.
+    // The timeout releases the UI and preserves any chunks already received.
+    state.finishRecording = finishRecording;
+    state.armStopWatchdog = () => {
+      stopWatchdog = setTimeout(finishRecording, 5000);
     };
     recorder.start(300);
     state.recordStartedAt = performance.now();
+    state.recordStarting = false;
     state.isRecording = true;
     started = true;
     document.body.classList.add('is-recording');
@@ -1400,6 +1465,9 @@ async function startRecording() {
     state.recorder = null;
     state.stream = null;
     state.recordStarting = false;
+    state.recordStopping = false;
+    state.finishRecording = null;
+    state.armStopWatchdog = null;
     document.body.classList.remove('is-recording');
     $('recordLabel').textContent = 'RECORD';
     $('recState').textContent = '';
@@ -1426,12 +1494,39 @@ async function startRecording() {
   }
 }
 function stopRecording() {
-  if (!state.isRecording || !state.recorder) return;
+  if (state.recordStopping || !state.isRecording || !state.recorder) return;
   const recorder = state.recorder;
+  state.recordStopping = true;
   state.isRecording = false;
-  $('recordButton').disabled = true;
+  $('recordLabel').textContent = 'FINISHING';
+  $('recState').textContent = '● ENDING';
   if (state.type === 'video' && state.element) state.element.pause();
-  if (recorder.state !== 'inactive') recorder.stop();
+  syncRecordControls(false);
+  try {
+    // Flush buffered encoder data when the browser supports it.
+    if (recorder.state !== 'inactive') {
+      if (typeof recorder.requestData === 'function') {
+        try { recorder.requestData(); } catch (_) { /* Optional encoder flush. */ }
+      }
+      recorder.stop();
+    } else if (typeof state.finishRecording === 'function') {
+      state.finishRecording();
+      return;
+    }
+    if (typeof state.armStopWatchdog === 'function') state.armStopWatchdog();
+  } catch (error) {
+    console.error('Stop recording failed:', error);
+    if (typeof state.finishRecording === 'function') state.finishRecording();
+    else {
+      state.recordStopping = false;
+      state.isRecording = false;
+      state.recordStarting = false;
+      $('recordLabel').textContent = 'RECORD';
+      $('recState').textContent = '';
+      syncRecordControls(false);
+      setStatus(`STOP FAILED: ${error.message}`, true);
+    }
+  }
 }
 function clearExport() {state.recordedBlob=null;state.recordedName='';$('exportPanel').hidden=true;}
 function setMode(mode) {
@@ -1747,6 +1842,7 @@ function bindEvents() {
   });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && !$('accidentPanel').hidden) closeAccidentPanel();
+    if (event.key === 'Escape' && $('stage').classList.contains('is-focus')) togglePreviewFocus(false);
   });
   document.querySelectorAll('[data-accident-level]').forEach(input => {
     input.addEventListener('input', () => {
@@ -1797,6 +1893,7 @@ function bindEvents() {
   ['pointerup','pointercancel','pointerleave'].forEach(type=>{
     $('canvas-host').addEventListener(type,()=>{state.touchTarget=0;state.pointerIsDown=false;state.kineticTarget=0;});
   });
+  $('previewExpand').addEventListener('click',()=>togglePreviewFocus());
   $('stage').addEventListener('dragover',event=>event.preventDefault());
   $('stage').addEventListener('drop',event=>{
     event.preventDefault();if(event.dataTransfer?.files?.[0])openFile(event.dataTransfer.files[0]);
@@ -1820,6 +1917,7 @@ function bindEvents() {
   $('depth').value=Math.round(state.depth*100);
   $('erosion').value=Math.round(state.erosion*100);
   $('drift').value=Math.round(state.drift*100);
+  syncRecordControls(false);
   setInterval(()=>{
     if(state.isRecording){
       const elapsed=Math.min(MAX_RECORD_SECONDS,(performance.now()-state.recordStartedAt)/1000);

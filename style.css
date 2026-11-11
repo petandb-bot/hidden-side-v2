@@ -182,3 +182,98 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .accident-level-row button { min-height:29px; border:1px solid #655a6c; background:#222025; color:#cfc3d5; font-size:9px; letter-spacing:.09em; }
 .accident-level-row button:hover { border-color:#ab96bf; }
 @media (max-width:480px) { .accident-panel-sheet { padding:14px 14px max(18px,env(safe-area-inset-bottom)); } .accident-level-row { grid-template-columns:80px minmax(66px,1fr) 24px 45px; gap:8px; } .accident-row { gap:7px; } .accident-tune-trigger { padding:6px 8px; } }
+
+
+/* v0.4.16 — condensed instrument-panel interface. Stage keeps all reclaimed height. */
+#app { max-width: 1220px; }
+.topbar { height: 44px; min-height: 44px; padding-inline: 20px; }
+.brand-mark { width: 22px; height: 22px; border-radius: 5px; }
+.brand-copy { gap: 3px; }
+.brand-copy strong { font-size: 11px; letter-spacing: .18em; }
+.brand-copy small { font-size: 8px; color: #89818c; }
+.top-meta { gap: 2px; font-size: 8px; }
+#stage { min-height: 178px; border-bottom: 1px solid #262427; }
+.stage-topline { top: 11px; left: 13px; right: 13px; }
+#modeIndex { display: none; }
+.stage-bottomline { bottom: 11px; left: 13px; right: 13px; font-size: 8px; }
+.control-area { padding: 9px 20px 11px; background: #141315; }
+.section-heading { font-size: 8px; margin-bottom: 5px; letter-spacing: .17em; }
+.mode-strip { gap: 9px; }
+.mode-button { min-height: 33px; gap: 0; padding: 7px 2px 8px; }
+.mode-num { display: none; }
+.mode-name { font-size: clamp(9px, 1.6vw, 11px); letter-spacing: .08em; }
+.variant-row { margin: 8px 0 0; gap: 12px; }
+.variant-button { min-height: 28px; padding: 5px 9px; }
+.trail-control { gap: 3px; }
+.behavior-row { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 14px; margin-top: 8px; }
+.macro-row, .accident-row { margin: 0; min-width: 0; gap: 8px; }
+.macro-label, .accident-label { font-size: 8px; letter-spacing: .09em; }
+.macro-strip, .accident-strip { min-width: 0; gap: 5px; }
+.macro-button, .accident-button { min-height: 28px; padding: 5px 4px; font-size: 8px; }
+.accident-tune-trigger { min-height: 28px; padding: 5px 7px; font-size: 8px; }
+.sliders { margin-top: 9px; gap: 18px; }
+.parameter-info { margin-bottom: 1px; font-size: 8px; }
+.parameter-info output { font-size: 9px; }
+.parameter input { height: 17px; }
+.quality-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 7px; padding-top: 6px; border-top: 1px solid #29262b; }
+.render-config { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 0; }
+.render-config label { font-size: 8px; color: #8c8790; letter-spacing: .12em; }
+.render-config select { min-width: 0; max-width: none; width: 100%; flex: 1; padding: 4px 2px 3px 0; font-size: 9px; border-color: #454147; overflow: hidden; text-overflow: ellipsis; }
+.actionbar { grid-template-columns: 1fr .86fr 1.2fr 1fr; padding: 9px 20px 4px; gap: 8px; }
+.actionbar:not(.has-video) { grid-template-columns: 1fr 1.2fr 1fr; }
+.actionbar:not(.has-video) #playButton { display: none; }
+.action { min-height: 39px; padding: 6px 4px; font-size: 9px; }
+.bottom-note { min-height: 18px; padding: 3px 20px 4px; font-size: 8px; }
+.is-recording .action-record { background: #2a2023; }
+.is-recording .action-record:disabled { opacity: .65; }
+@media (min-width: 760px) {
+  .topbar { padding-inline: 26px; }
+  .control-area { padding: 11px 26px 13px; }
+  .actionbar { padding: 9px 26px 5px; }
+  .behavior-row { gap: 22px; }
+  .sliders { gap: 30px; }
+}
+@media (max-width: 480px) {
+  .topbar { height: 42px; min-height: 42px; padding-inline: 13px; }
+  .control-area { padding: 8px 12px 9px; }
+  .mode-strip { gap: 5px; }
+  .mode-button { min-height: 30px; padding-block: 6px; }
+  .mode-name { font-size: clamp(8px, 2.2vw, 10px); letter-spacing: .01em; }
+  .variant-row { margin-top: 6px; }
+  .behavior-row { gap: 9px; margin-top: 7px; }
+  .macro-row, .accident-row { gap: 5px; }
+  .macro-label, .accident-label { font-size: 7px; }
+  .macro-button, .accident-button, .accident-tune-trigger { font-size: 8px; padding-inline: 3px; }
+  .accident-tune-trigger { padding-inline: 5px; }
+  .sliders { gap: 13px; margin-top: 7px; }
+  .quality-row { gap: 10px; margin-top: 5px; }
+  .render-config { gap: 6px; }
+  .render-config label { font-size: 7px; }
+  .render-config select { font-size: 8px; }
+  .actionbar { padding: 7px 10px 3px; gap: 6px; }
+  .action { min-height: 39px; }
+  .bottom-note { padding: 3px 12px 4px; }
+}
+@media (max-width: 350px) {
+  .behavior-row { grid-template-columns: 1fr; gap: 5px; }
+  .accident-row { justify-content: space-between; }
+}
+@media (max-height: 650px) {
+  .topbar { height: 38px; min-height: 38px; }
+  .control-area { padding-top: 5px; padding-bottom: 6px; }
+  .section-heading { margin-bottom: 3px; }
+  .mode-button { min-height: 27px; padding-block: 5px; }
+  .variant-row { margin-top: 5px; }
+  .behavior-row { margin-top: 5px; }
+  .sliders { margin-top: 5px; }
+  .quality-row { margin-top: 4px; padding-top: 4px; }
+  .action { min-height: 35px; }
+}
+
+/* Optional stage focus for examining moving details. Works without Fullscreen API. */
+.preview-expand { position:absolute; z-index:6; top:9px; left:13px; border:1px solid #3b353e; background:#0c0b0dd9; padding:5px 8px; min-height:25px; color:#a89fb0; font-size:8px; letter-spacing:.12em; }
+.preview-expand span { font-size:12px; margin-left:8px; line-height:0; }
+#stage:not(.has-source) .preview-expand { display:none; }
+#stage.is-focus { position:fixed; inset:0; z-index:65; width:100vw; height:100dvh; max-height:none; min-height:0; background:#080809; border:0; }
+#stage.is-focus .stage-bottomline { bottom:max(13px,env(safe-area-inset-bottom)); }
+#stage.is-focus .preview-expand { top:max(12px,env(safe-area-inset-top)); left:14px; background:#17151ae6; }
