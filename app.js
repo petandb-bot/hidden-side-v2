@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.12 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.13 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -30,7 +30,7 @@ const state = {
     startAt: 0, duration: 0, intensity: 0, active: false, manualPreview: false },
   w: 4, h: 4, originalW: 4, originalH: 4,
   renderW: 4, renderH: 4, sourceW: 0, sourceH: 0,
-  quality: 'balanced', outputQuality: 'high', renderPurpose: 'preview',
+  quality: 'balanced', outputQuality: 'high', renderPurpose: 'preview', isExporting: false,
   frameDirty: false, frameTime: -1, imageReady: false,
   videoReady: false, isRecording: false, recordStarting: false, recorder: null, stream: null,
   recordStartedAt: 0, recordDuration: 0, recordedBlob: null, recordedName: '',
@@ -81,7 +81,8 @@ function setup() {
 }
 
 function draw() {
-  if (!gl || state.renderingError) return;
+  // A PNG export renders at a temporary resolution; the preview loop must not overwrite it.
+  if (!gl || state.renderingError || state.isExporting) return;
   if (document.hidden) return;
   if (state.type === 'none' || !state.imageReady) {
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -818,12 +819,13 @@ function setRenderSize(w,h,clearHistory=false) {
   } else if(clearHistory) resetFeedback();
   resizePreview();
 }
-function setSourceDimensions(w,h) {
+function setSourceDimensions(w,h,preserveHistory=false) {
   state.originalW=w;state.originalH=h;
   const [sw,sh]=state.type==='photo' ? sizeForLimit(w,h,PREVIEW_PHOTO_SOURCE) : previewSize();
   allocateSourceTexture(sw,sh);
   const [pw,ph]=previewSize();
-  setRenderSize(pw,ph,true);
+  // A source change needs a fresh history; returning from PNG export does not.
+  setRenderSize(pw,ph,!preserveHistory);
   $('dimensionsTag').textContent=`${pw} × ${ph} · GPU`;
 }
 function changeVideoSourceSize(w,h) {
@@ -832,7 +834,7 @@ function changeVideoSourceSize(w,h) {
   state.frameDirty=true;
 }
 function changeQuality(q) {
-  if (!PERFORMANCE[q] || state.isRecording || state.recordStarting) return;
+  if (!PERFORMANCE[q] || state.isRecording || state.recordStarting || state.isExporting) return;
   state.quality=q;
   frameRate(PERFORMANCE[state.quality].fps);
   if(state.imageReady){
@@ -845,7 +847,7 @@ function changeQuality(q) {
   setStatus(`QUALITY / ${q.toUpperCase()}`);
 }
 function changeOutputQuality(q) {
-  if (!OUTPUT_PRESETS[q] || state.isRecording || state.recordStarting) return;
+  if (!OUTPUT_PRESETS[q] || state.isRecording || state.recordStarting || state.isExporting) return;
   state.outputQuality = q;
   saveOutputPreference();
   const preset = outputPreset();
@@ -991,7 +993,7 @@ async function awaitVideoMetadata(video) {
 }
 
 async function openFile(file) {
-  if (!file || state.isRecording || state.recordStarting) return;
+  if (!file || state.isRecording || state.recordStarting || state.isExporting) return;
   if (!gl || !sourceCtx || !program || state.renderingError) {
     setStatus('WEBGL INIT FAILED — RELOAD', true);
     return;
@@ -1165,47 +1167,65 @@ async function shareOrSave(blob,name,preferShare=true) {
   downloadBlob(blob,name);
 }
 async function saveStill() {
-  if (!state.imageReady || state.isRecording || state.recordStarting) return;
+  if (!state.imageReady || state.isRecording || state.recordStarting || state.isExporting) return;
+  state.isExporting = true;
+  syncRecordControls(false);
+  const originalPurpose = state.renderPurpose;
+  const [exportW,exportH] = exportSize();
+  let blob = null;
   try {
-    const originalSize=[canvas.width,canvas.height];
-    const originalPurpose = state.renderPurpose;
-    const [exportW,exportH]=exportSize();
+    state.renderPurpose = 'export';
+    // Preserve the existing history texture instead of clearing it.
+    // GHOST and SEEP need that accumulated temporal information in the PNG.
+    setRenderSize(exportW,exportH,false);
+    if (state.type === 'photo') {
+      allocateSourceTexture(exportW,exportH);
+    } else if (state.type === 'video') {
+      changeVideoSourceSize(exportW,exportH);
+    }
+    sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
+    uploadSource();
+    state.frameDirty = false;
+    // Render a still against the current preview history, without advancing it.
+    renderFrame(performance.now()*0.001,false);
+    blob = await toBlobAsync(canvas,'image/png');
+  } catch(error) {
+    setStatus(`EXPORT FAILED: ${error.message}`,true);
+    console.error(error);
+  } finally {
+    state.renderPurpose = originalPurpose;
     try {
-      state.renderPurpose = 'export';
-      setRenderSize(exportW,exportH,true);
-      if (state.type==='photo') {
-        allocateSourceTexture(exportW, exportH);
-        sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
-        uploadSource();
-        state.frameDirty=false;
-      } else if (state.type === 'video') {
-        changeVideoSourceSize(exportW, exportH);
-        sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
-        uploadSource();
-        state.frameDirty=false;
-      }
-      renderFrame(performance.now()*.001,false);
-      const blob=await toBlobAsync(canvas,'image/png');
-      const name=`hidden_${safeBaseName(state.fileName)}_m${state.mode+1}_${state.outputQuality}.png`;
-      await shareOrSave(blob,name,true);
-      setStatus(`IMAGE EXPORTED · ${exportW} × ${exportH} · ${state.outputQuality.toUpperCase()}`);
-    } finally {
-      state.renderPurpose = originalPurpose;
       if (state.imageReady) {
-        setSourceDimensions(state.originalW, state.originalH);
+        // Restore preview textures without dropping the temporal state.
+        setSourceDimensions(state.originalW,state.originalH,true);
         if (state.type === 'photo') {
           sourceCtx.drawImage(state.element,0,0,state.sourceW,state.sourceH);
           uploadSource();
-          state.frameDirty=false;
+          state.frameDirty = false;
         } else {
-          state.frameDirty=true;
+          state.frameDirty = true;
         }
-      } else if(canvas.width!==originalSize[0] || canvas.height!==originalSize[1]) {
-        setRenderSize(...originalSize, true);
       }
+    } catch(error) {
+      setStatus(`PREVIEW RESTORE FAILED: ${error.message}`,true);
+      console.error(error);
+    } finally {
+      state.isExporting = false;
+      syncRecordControls(false);
     }
-  } catch(error) {setStatus(`EXPORT FAILED: ${error.message}`,true);console.error(error);}
+  }
+  if (!blob) return;
+  const name=`hidden_${safeBaseName(state.fileName)}_m${state.mode+1}_${state.outputQuality}.png`;
+  try {
+    // Share only after restoring the lightweight preview; iOS share sheets can stay open.
+    await shareOrSave(blob,name,true);
+    setStatus(`IMAGE EXPORTED · ${exportW} × ${exportH} · ${state.outputQuality.toUpperCase()}`);
+  } catch(error) {
+    setStatus(`SAVE FAILED: ${error.message}`,true);
+    console.error(error);
+  }
 }
+
 function canRecord() {
   return !!canvas && typeof canvas.captureStream === 'function' &&
     typeof MediaRecorder !== 'undefined';
@@ -1221,8 +1241,8 @@ function pickMimeType() {
   return ordered.find(mime => MediaRecorder.isTypeSupported(mime)) || '';
 }
 function syncRecordControls(busy = false) {
-  const locked = busy || state.isRecording || state.recordStarting;
-  $('recordButton').disabled = busy || !state.imageReady || !canRecord();
+  const locked = busy || state.isRecording || state.recordStarting || state.isExporting;
+  $('recordButton').disabled = locked || !state.imageReady || !canRecord();
   $('importButton').disabled = locked;
   $('playButton').disabled = locked || state.type !== 'video' || !state.videoReady;
   $('saveButton').disabled = locked || !state.imageReady;
@@ -1230,7 +1250,7 @@ function syncRecordControls(busy = false) {
   $('outputQuality').disabled = locked;
 }
 async function startRecording() {
-  if (!state.imageReady || state.isRecording || state.recordStarting) return;
+  if (!state.imageReady || state.isRecording || state.recordStarting || state.isExporting) return;
   if (!canRecord()) {
     setStatus('RECORD UNSUPPORTED IN THIS BROWSER', true);
     return;
