@@ -11,13 +11,13 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon-192.png" type="image/png">
   <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
-  <link rel="stylesheet" href="./style.css?v=0417">
+  <link rel="stylesheet" href="./style.css?v=0418">
   <title>HIDDEN SIDE — image excavator</title>
 </head>
 <body>
   <main id="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>V2 / 0.4.17</small></div></div>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><div class="brand-copy"><strong>HIDDEN SIDE</strong><small>V2 / 0.4.18</small></div></div>
       <div class="top-meta"><span id="sourceTag">NO SIGNAL</span><span id="dimensionsTag">—</span></div>
     </header>
 
@@ -33,16 +33,19 @@
         <button id="emptyImport" class="outline-action" type="button">IMPORT <span>+</span></button>
       </div>
       <div class="stage-bottomline"><span id="assetName">NO SOURCE LOADED</span><span id="timecode">00:00</span></div>
+      <div class="stage-feedback" id="status" role="status" aria-live="polite" aria-atomic="true"></div>
     </section>
 
     <section class="control-area" aria-label="Processing controls">
-      <div class="section-heading"><span>PROCESS / 05</span><button id="reroll" class="plain-button" type="button" aria-label="Reseed image transformations">RESEED</button></div>
-      <div class="mode-strip" id="modes" role="group" aria-label="Processing modes">
+      <div class="mode-navigation">
+        <div class="mode-strip" id="modes" role="group" aria-label="Processing modes">
         <button type="button" class="mode-button active" data-mode="0"><span class="mode-num">01</span><span class="mode-name">UNDER</span></button>
         <button type="button" class="mode-button" data-mode="1"><span class="mode-num">02</span><span class="mode-name">NEGATIVE</span></button>
         <button type="button" class="mode-button" data-mode="2"><span class="mode-num">03</span><span class="mode-name">RELIEF</span></button>
         <button type="button" class="mode-button" data-mode="3"><span class="mode-num">04</span><span class="mode-name">SEEP</span></button>
         <button type="button" class="mode-button" data-mode="4"><span class="mode-num">05</span><span class="mode-name">GHOST</span></button>
+        </div>
+        <button id="reroll" class="reseed-button" type="button" aria-label="Reseed transformations" title="Reseed transformations"><span aria-hidden="true" class="reseed-icon">↻</span> RESEED</button>
       </div>
       <div class="variant-row" id="variantRow">
         <div class="variant-strip" id="variantStrip" role="group" aria-label="Variant profile">
@@ -97,12 +100,11 @@
     </section>
 
     <footer class="actionbar" id="actionbar">
-      <button type="button" id="importButton" class="action"><span class="action-icon">+</span><span>IMPORT</span></button>
+      <button type="button" id="importButton" class="action"><span class="action-icon">+</span><span>OPEN FILE</span></button>
       <button type="button" id="playButton" class="action" disabled><span class="action-icon" id="playIcon">▶</span><span id="playLabel">PLAY</span></button>
       <button type="button" id="saveButton" class="action action-primary" disabled><span class="action-icon">↓</span><span>SAVE IMAGE</span></button>
       <button type="button" id="recordButton" class="action action-record" disabled><span class="record-dot"></span><span id="recordLabel">RECORD</span></button>
     </footer>
-    <div class="bottom-note" id="status" role="status" aria-live="polite">LOCAL / GPU</div>
   </main>
 
   <input id="fileInput" type="file" accept="image/*,video/*,.heic,.heif,.HEIC,.HEIF,.mov,.mp4,.m4v,.webm" hidden>
@@ -129,6 +131,6 @@
   </div>
   <video id="sourceVideo" muted playsinline webkit-playsinline preload="auto" style="display:none"></video>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./app.js?v=0417"></script>
+  <script src="./app.js?v=0418"></script>
 </body>
 </html>

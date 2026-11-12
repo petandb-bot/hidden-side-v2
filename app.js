@@ -1,4 +1,4 @@
-/* HIDDEN SIDE v0.4.17 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
+/* HIDDEN SIDE v0.4.18 / V2 | p5.js 1.11.13 | WebGL1 | local GPU processing */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -1169,10 +1169,19 @@ function secondsToClock(t) {
   const n=Math.floor(t);
   return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
 }
+// Status is transient and never consumes stage height or blocks a footer control.
+let statusHideTimer = null;
 function setStatus(message, error=false) {
-  if (!$('status')) return;
-  $('status').textContent=message;
-  $('status').style.color=error?'#f6a69f':'#86847c';
+  const el = $('status');
+  if (!el) return;
+  el.textContent = message;
+  el.classList.toggle('is-error', !!error);
+  el.classList.add('is-visible');
+  if (statusHideTimer !== null) clearTimeout(statusHideTimer);
+  statusHideTimer = setTimeout(() => {
+    el.classList.remove('is-visible');
+    statusHideTimer = null;
+  }, error ? 6500 : 2500);
 }
 function togglePlay() {
   if (state.type!=='video'||!state.videoReady || state.recordStarting) return;

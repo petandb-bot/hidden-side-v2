@@ -277,3 +277,81 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 #stage.is-focus { position:fixed; inset:0; z-index:65; width:100vw; height:100dvh; max-height:none; min-height:0; background:#080809; border:0; }
 #stage.is-focus .stage-bottomline { bottom:max(13px,env(safe-area-inset-bottom)); }
 #stage.is-focus .preview-expand { top:max(12px,env(safe-area-inset-top)); left:14px; background:#17151ae6; }
+
+
+/* v0.4.18 — final-pass UI: no redundant section header or permanent footer status. */
+/* The home-indicator inset is applied only once, by the action bar. */
+#app { min-height: 100vh; min-height: 100dvh; height: 100dvh; padding-bottom: 0; }
+#stage { flex: 1 1 0; min-height: 150px; }
+.mode-navigation { display: flex; gap: 11px; align-items: flex-end; min-width: 0; }
+.mode-navigation .mode-strip { flex: 1 1 auto; min-width: 0; gap: 8px; }
+.mode-navigation .mode-button { min-height: 35px; padding: 8px 2px 9px; }
+.mode-navigation .mode-name { color: #aaa5ac; font-size: clamp(9px, 1.45vw, 11px); font-weight: 580; letter-spacing: .065em; }
+.mode-navigation .mode-button.active .mode-name { color: #f0ebf4; }
+.mode-navigation .mode-button.active { border-bottom: 2px solid #bca5d3; }
+.reseed-button { flex: none; min-height: 31px; margin-bottom: 2px; padding: 5px 9px; border: 1px solid #4b4650; border-radius: 2px; background: #1e1b20; color: #c1b5c8; font-size: 9px; font-weight: 550; letter-spacing: .075em; white-space: nowrap; }
+.reseed-button .reseed-icon { font-size: 14px; vertical-align: -1px; margin-right: 2px; }
+.reseed-button:active { background: #42394a; }
+.variant-row { margin-top: 9px; }
+.variant-button, .macro-button, .accident-button { border-color: #413d42; background: #19171a; color: #a19ca5; font-size: 9px; font-weight: 550; letter-spacing: .075em; }
+.variant-button.active, .macro-button.active, .accident-button.active { background: #504456; color: #f4ecf7; border-color: #ac94b8; }
+.variant-button.active:hover, .macro-button.active:hover, .accident-button.active:hover { background: #5a4a63; }
+.variant-button { min-height: 32px; }
+.macro-button, .accident-button, .accident-tune-trigger { min-height: 32px; }
+.accident-tune-trigger { border-color: #625569; color: #d3c3df; background: #27222b; font-weight: 550; }
+.parameter-info { color: #b9b5b9; }
+.quality-row { border-top-color: #39333c; }
+.actionbar { grid-template-columns: 1fr .9fr 1.25fr 1fr; border-top: 1px solid #39343b; background: #131215; padding-top: 10px; padding-bottom: max(9px, env(safe-area-inset-bottom)); }
+.actionbar:not(.has-video) { grid-template-columns: 1fr 1.22fr 1fr; }
+.action { min-height: 44px; border-radius: 2px; font-size: 10px; font-weight: 600; letter-spacing: .03em; }
+#importButton { border-color: #66616a; color: #d9d3da; background: #1b191d; }
+#saveButton { border-color: #dcd5d7; color: #171419; background: #dcd5d7; }
+#recordButton { border-color: #9a85ae; color: #e0cbea; background: #2b2331; }
+#recordButton .record-dot { width: 9px; height: 9px; border-color: #d0addc; }
+#playButton { border-color: #646069; color: #d5d0d8; }
+#saveButton:hover:not(:disabled) { background: #f0e8eb; border-color: #f0e8eb; }
+#recordButton:hover:not(:disabled) { background: #403047; border-color: #b5a2c3; }
+#recordButton:disabled { opacity: .43; }
+.is-recording #recordButton, .is-recording #recordButton:hover { border-color: #dca4a0; background: #593337; color: #ffe5e3; }
+.is-recording #recordButton .record-dot { background: #ffaba6; border-color: #ffaba6; }
+.stage-feedback { position: absolute; z-index: 7; right: 13px; bottom: 35px; max-width: calc(100% - 38px); pointer-events: none; opacity: 0; transform: translateY(3px); transition: opacity .18s ease, transform .18s ease; padding: 7px 9px; border: 1px solid #4f4953; border-radius: 2px; background: rgba(20, 18, 23, .91); color: #e0d7e5; font-size: 9px; font-weight: 530; letter-spacing: .055em; text-align: right; line-height: 1.4; overflow-wrap: anywhere; }
+.stage-feedback.is-visible { opacity: 1; transform: none; }
+.stage-feedback.is-error { color: #ffd5ce; border-color: #b56c68; background: rgba(48, 25, 27, .95); }
+#stage.is-focus .stage-feedback { bottom: max(40px, calc(env(safe-area-inset-bottom) + 37px)); }
+@media (max-width: 480px) {
+  .mode-navigation { gap: 5px; }
+  .mode-navigation .mode-strip { gap: 3px; }
+  .mode-navigation .mode-button { min-height: 33px; padding-inline: 0; padding-block: 7px; }
+  .mode-navigation .mode-name { font-size: clamp(8px, 2.12vw, 10px); letter-spacing: 0; }
+  .reseed-button { min-height: 30px; margin-bottom: 2px; padding: 5px 5px; font-size: 8px; letter-spacing: .025em; }
+  .reseed-button .reseed-icon { font-size: 13px; margin-right: 0; }
+  .variant-row { margin-top: 7px; }
+  .variant-button { min-height: 31px; }
+  .macro-button, .accident-button, .accident-tune-trigger { min-height: 31px; font-size: 8px; }
+  .actionbar { padding: 9px 10px max(8px, env(safe-area-inset-bottom)); }
+  .action { min-height: 43px; font-size: 9px; gap: 5px; }
+  .stage-feedback { right: 10px; bottom: 32px; }
+}
+@media (max-width: 350px) {
+  .reseed-button { letter-spacing: -.04em; padding-inline: 4px; }
+  .mode-navigation .mode-name { font-size: 8px; }
+  .action { font-size: 8px; }
+}
+@media (max-height: 650px) {
+  .mode-navigation .mode-button { min-height: 29px; padding-block: 5px; }
+  .variant-row { margin-top: 5px; }
+  .variant-button, .macro-button, .accident-button, .accident-tune-trigger { min-height: 29px; }
+  .action { min-height: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-feedback { transition: none; }
+}
+
+/* Legibility calibration for modern phone widths, with a narrow-phone fallback. */
+@media (min-width: 351px) and (max-width: 480px) {
+  .mode-navigation .mode-name { font-size: 9px; }
+  .macro-label, .accident-label { font-size: 8px; letter-spacing: .035em; }
+  .macro-button, .accident-button, .accident-tune-trigger { font-size: 9px; }
+  .render-config label { font-size: 8px; }
+  .render-config select { font-size: 9px; }
+}

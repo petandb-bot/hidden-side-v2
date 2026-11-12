@@ -1,15 +1,17 @@
-# HIDDEN SIDE V2 · v0.4.17
+# HIDDEN SIDE V2 · v0.4.18
 
 A local browser-based image/video processing instrument built with p5.js 1.11.13, WebGL1 / GLSL ES 1.00.
 
-## What's changed in v0.4.17
+## Base and scope
 
-- **REC / STOP fixed**: The record button remains enabled while recording. The recording-start flag is cleared after `MediaRecorder.start()`, instead of keeping STOP disabled.
-- **Safer finishing and saving**: Recordings are assembled before restoring the GPU preview. If preview restoration fails, a captured file can still be downloaded. A stop-event watchdog avoids an indefinitely locked UI.
-- **Photo-to-video recording**: The canvas capture track receives rendered frames explicitly on browsers exposing `requestFrame()`; regular `captureStream(fps)` remains supported.
-- **Larger preview**: The controls are condensed to give the image more vertical space, with PREVIEW and OUTPUT settings side by side. RANGE and ACCIDENT occupy one row when space allows. The new **FOCUS** control temporarily expands the preview over the screen and can be closed with CLOSE / Escape.
-- **Cleaner controls**: Decorative mode numbers and the mode index overlay are hidden. PLAY is hidden while working with photos; it remains available for videos.
-- **Preserved processing**: GHOST color/melt shaders, UNDER/SEEP BREAK variants, all five modes, RESEED, and ACCIDENT TUNE / TEST are unchanged.
+v0.4.18 is a UI-only refinement of v0.4.17. The fragment shader, the five visual engines, TRAIL/DRIFT, FOCUS logic, PNG export, the 45-second MediaRecorder workflow, and the original format limits are unchanged.
+
+## UI refinements in v0.4.18
+
+- Removed the redundant `PROCESS / 05` title; RESEED now sits beside the five mode tabs.
+- Removed the permanent status footer; short-lived messages appear over the preview, and longer error messages remain visible for 6.5 seconds.
+- Distinct button hierarchy: subdued OPEN FILE, light SAVE IMAGE, violet RECORD; clearer active state for mode variants, CALM/BREAK, and ACCIDENT.
+- Controls and processing engines are unchanged, including GHOST, RESEED, FOCUS, quality modes, photo/video import and capture.
 
 ## Controls and quality
 
